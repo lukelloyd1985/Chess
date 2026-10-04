@@ -70,7 +70,12 @@ restrict the row to its two players but cannot check chess legality), and online
 
 ## Publishing to Google Play
 
-The first release of a new app must be created manually in Play Console (with Play App Signing); after that a
+1. **Host the privacy policy and account deletion pages** Play requires: `docs/privacy.html` and `docs/delete-account.html`
+   are published by `.github/workflows/pages.yml` (only when `docs/` changes, on pushes to `main` or a manual run). Enable
+   Settings -> Pages -> *Source* -> **GitHub Actions**; they are then served at
+   `https://lukelloyd1985.github.io/Chess/privacy.html` and `.../delete-account.html` - use those URLs in Play Console
+   (privacy policy, and the account-deletion link in the Data safety section). Update the pages if the data the app collects changes.
+2. The first release of a new app must be created manually in Play Console (with Play App Signing); after that a
 published GitHub Release uploads the AAB to the closed-testing (`alpha`) track via `publishReleaseBundle`, and
 `publishListing` pushes the text under `app/src/main/play/`. Add icon / feature graphic / screenshots under
 `app/src/main/play/listings/en-US/graphics/` to publish them too.
