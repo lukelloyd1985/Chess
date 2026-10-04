@@ -8,7 +8,7 @@ import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
-import com.github.lukelloyd1985.chess.R
+import com.github.lukelloyd1985.chess.BuildConfig
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.FirebaseApp
@@ -28,7 +28,7 @@ sealed interface SignInResult {
 
 /** Google sign-in through Credential Manager, exchanged for a Firebase Auth session. */
 class AuthManager(private val appContext: Context) {
-    /** True when google-services.json was supplied at build time. */
+    /** True when the Firebase build values were supplied (see ChessApp.initFirebase). */
     val isConfigured: Boolean get() = FirebaseApp.getApps(appContext).isNotEmpty()
 
     private val _user = MutableStateFlow(currentUser())
@@ -48,14 +48,11 @@ class AuthManager(private val appContext: Context) {
         _guest.value = true
     }
 
-    private fun webClientId(): String {
-        val generated = appContext.resources.getIdentifier("default_web_client_id", "string", appContext.packageName)
-        return appContext.getString(if (generated != 0) generated else R.string.google_web_client_id)
-    }
+    private fun webClientId(): String = BuildConfig.GOOGLE_WEB_CLIENT_ID
 
     suspend fun signInWithGoogle(activity: Activity): SignInResult {
         if (!isConfigured) {
-            return SignInResult.Failure("Firebase is not configured. Add app/google-services.json (see README) and rebuild.")
+            return SignInResult.Failure("Firebase is not configured in this build. Set the FIREBASE_* and GOOGLE_WEB_CLIENT_ID values (see README).")
         }
         return try {
             val option = GetGoogleIdOption.Builder()

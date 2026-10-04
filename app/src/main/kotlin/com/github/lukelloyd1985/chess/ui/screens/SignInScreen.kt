@@ -84,7 +84,7 @@ fun SignInScreen(auth: AuthManager) {
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp), textAlign = TextAlign.Center) }
         if (!auth.isConfigured) {
             Text(
-                "Google sign-in isn't configured in this build (no google-services.json).",
+                "Google sign-in isn't configured in this build (Firebase values missing).",
                 color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 12.dp),
             )

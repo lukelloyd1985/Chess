@@ -58,7 +58,7 @@ fun OnlineLobbyScreen(
 
         if (user == null || !configured) {
             Text(
-                if (!configured) "Online play needs Firebase. Add app/google-services.json and rebuild (see README)."
+                if (!configured) "Online play needs Firebase. Set the FIREBASE_* build values (see README)."
                 else "Sign in with Google to play friends online.",
                 color = Muted,
                 modifier = Modifier.padding(16.dp),

@@ -1,0 +1,6 @@
+Play chess your way, powered by Stockfish 19.
+
+• Play the computer – nine bots from beginner to full-strength Stockfish, with hints, undo and optional clocks.
+• Play friends – start an online game and share a 6-character code, or pass the device for same-screen play.
+• Unlimited game analysis – review any finished game or imported PGN as often as you like: best/mistake/blunder ratings for every move, accuracy for both players, an evaluation graph, engine lines and best-move arrows.
+• Sign in with Google to play online. Offline play works without an account.

@@ -2,15 +2,9 @@ import java.security.MessageDigest
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
+    // Kotlin compiles via AGP's built-in Kotlin support - no kotlin-android plugin.
     alias(libs.plugins.kotlin.compose)
-}
-
-// Firebase (Google sign-in + online games) is enabled only when the developer
-// has dropped their own google-services.json next to this file. Without it the
-// app still builds and runs; sign-in/online play show a "not configured" notice.
-if (file("google-services.json").exists()) {
-    apply(plugin = "com.google.gms.google-services")
+    alias(libs.plugins.play.publisher)
 }
 
 // Stockfish 19 needs its NNUE network file. It is downloaded at build time (the
@@ -65,21 +59,59 @@ val downloadNnue by tasks.registering {
 
 android {
     namespace = "com.github.lukelloyd1985.chess"
-    compileSdk = 35
+    // 36 (not 37): API 37 isn't an installable stable SDK platform yet; see MyTaskList.
+    compileSdk = 36
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.github.lukelloyd1985.chess"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        // Play rejects non-increasing versionCodes; the CI run number is a monotonic source.
+        versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        // The release workflow sets this to the git tag (e.g. "v1.2.3").
+        versionName = System.getenv("RELEASE_VERSION_NAME") ?: "1.0.0-dev"
 
         // Stockfish is built for 64-bit ABIs only.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
             cmake {
                 arguments += listOf("-DANDROID_STL=c++_static")
+            }
+        }
+
+        // Google "Web application" OAuth client ID used by Credential Manager (not a secret).
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+
+        // Firebase (Auth + Firestore) is initialised manually in ChessApp from these
+        // non-secret identifiers instead of google-services.json + the Gradle plugin.
+        // Project ID, API key and Sender ID are project-level; App ID differs per build type.
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${System.getenv("FIREBASE_PROJECT_ID") ?: ""}\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"${System.getenv("FIREBASE_API_KEY") ?: ""}\"")
+        buildConfigField("String", "FIREBASE_SENDER_ID", "\"${System.getenv("FIREBASE_SENDER_ID") ?: ""}\"")
+    }
+
+    signingConfigs {
+        create("release") {
+            // Store and key password are the same (PKCS12 keystores have a single password).
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = "chess"
+                keyPassword = System.getenv("KEYSTORE_PASSWORD")
+            }
+        }
+        // CI runners are fresh VMs, so AGP would generate a new random debug keystore on every
+        // build and Google Sign-In would reject the ever-changing certificate. A stable keystore
+        // from CI lets its SHA-1 be registered in Firebase once.
+        getByName("debug") {
+            val keystorePath = System.getenv("DEBUG_KEYSTORE_PATH")
+            if (!keystorePath.isNullOrBlank()) {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("DEBUG_KEYSTORE_PASSWORD")
+                keyAlias = "chessdebug"
+                keyPassword = System.getenv("DEBUG_KEYSTORE_PASSWORD")
             }
         }
     }
@@ -94,9 +126,24 @@ android {
     sourceSets.getByName("main").assets.srcDir(nnueOutDir)
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            // The .debug package is its own registered Firebase Android app, so own App ID.
+            buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${System.getenv("FIREBASE_APPLICATION_ID_DEBUG") ?: ""}\"")
+        }
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            // Without release-signing secrets fall back to the debug keystore so a testable APK is still produced.
+            signingConfig = if (!keystorePath.isNullOrBlank()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${System.getenv("FIREBASE_APPLICATION_ID") ?: ""}\"")
         }
     }
 
@@ -104,14 +151,24 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     // The engine binary ships as lib/<abi>/libstockfish.so and is executed from
     // nativeLibraryDir, which requires the libraries to be extracted on install.
     packaging { jniLibs { useLegacyPackaging = true } }
     androidResources { noCompress += "nnue" }
+}
+
+// Publishes the release bundle to Play's closed testing track via `publishReleaseBundle`.
+// Only running a publish task needs credentials (ANDROID_PUBLISHER_CREDENTIALS).
+play {
+    track.set("alpha")
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
+    defaultToAppBundles.set(true)
 }
 
 tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {

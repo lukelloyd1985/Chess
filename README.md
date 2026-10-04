@@ -18,7 +18,8 @@ Application ID / package: `com.github.lukelloyd1985.chess`
 
 ## Building
 
-Requirements: JDK 17, Android SDK 35, NDK `27.2.12479018`, CMake `3.22.1`.
+Requirements: JDK 17, Android SDK 36, NDK `27.2.12479018`, CMake `3.22.1` (versions mirror the
+MyTaskList repo's working CI: AGP 9.3, Kotlin 2.4, Gradle 9.5).
 
 ```sh
 ./gradlew :core:test          # rules engine tests
@@ -29,16 +30,40 @@ Stockfish 19 needs its NNUE network (`nn-1a298aa575a0.nnue`). The build download
 `tests.stockfishchess.org` and verifies the SHA-256 prefix. To build offline, put the file in `app/nnue/`.
 Only 64-bit ABIs (`arm64-v8a`, `x86_64`) are built.
 
-## Google sign-in & online play (Firebase setup)
+## CI (`.github/workflows/android-build.yml`)
 
-The app builds without this, but sign-in and online games stay disabled until you add your own Firebase project:
+Copied from MyTaskList. Run it from the Actions tab (`debug` or `release` APK), or publish a GitHub
+Release to build the signed release APK + AAB, attach them to the release and upload to Google Play's
+closed-testing track. Repository secrets (all optional unless you want that feature):
 
-1. Create a Firebase project and add an Android app with package `com.github.lukelloyd1985.chess` and your debug/release **SHA-1**.
-2. Enable **Authentication → Google** and **Firestore**.
-3. Download `google-services.json` into `app/` (it is git-ignored). The Google Services plugin is applied automatically when the file exists, and the web client ID is picked up from it.
-4. Publish `firestore.rules` to your Firestore database.
+| Secret | Purpose |
+| --- | --- |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`, `FIREBASE_SENDER_ID` | Firebase project values (shared by debug + release) |
+| `FIREBASE_APPLICATION_ID` / `FIREBASE_APPLICATION_ID_DEBUG` | Firebase App ID of the `com.github.lukelloyd1985.chess` / `.debug` Android app |
+| `GOOGLE_WEB_CLIENT_ID` | OAuth **Web application** client ID used by Credential Manager |
+| `DEBUG_KEYSTORE_BASE64`, `DEBUG_KEYSTORE_PASSWORD` | Stable debug keystore (alias `chessdebug`) so its SHA-1 can be registered once |
+| `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD` | Release keystore (alias `chess`) |
+| `PLAY_SERVICE_ACCOUNT_JSON` | Play Console service account key for publishing |
+
+Without the Firebase secrets the app still builds and plays offline; sign-in and online games show "not configured".
+
+## Firebase setup (Google sign-in & online play)
+
+1. Create a Firebase project; register two Android apps: `com.github.lukelloyd1985.chess` and
+   `com.github.lukelloyd1985.chess.debug`, each with its signing SHA-1. Skip the `google-services.json` download -
+   the app initialises Firebase manually from the secrets above.
+2. Enable **Authentication -> Google** and **Firestore**, and publish `firestore.rules`.
+3. In Google Cloud Console create the OAuth **Web application** client (`GOOGLE_WEB_CLIENT_ID`). The "Android key
+   (auto created by Firebase)" is `FIREBASE_API_KEY`.
 
 Notes on online play: moves are validated by the clients (Firestore rules enforce turn order and one-move-at-a-time appends, but cannot validate chess legality), and online games are untimed.
+
+## Publishing to Google Play
+
+The first release of a new app must be created manually in Play Console (with Play App Signing); after that a
+published GitHub Release uploads the AAB to the closed-testing (`alpha`) track via `publishReleaseBundle`, and
+`publishListing` pushes the text under `app/src/main/play/`. Add icon / feature graphic / screenshots under
+`app/src/main/play/listings/en-US/graphics/` to publish them too.
 
 ## Licence
 

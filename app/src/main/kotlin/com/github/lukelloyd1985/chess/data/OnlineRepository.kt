@@ -44,7 +44,7 @@ class OnlineRepository(private val context: Context) {
     private val games get() = db.collection("games")
 
     private fun requireAvailable() {
-        check(available) { "Online play needs Firebase. Add app/google-services.json (see README) and rebuild." }
+        check(available) { "Online play needs Firebase. Set the FIREBASE_* values (see README) and rebuild." }
     }
 
     /** Creates a waiting game and returns its share code. [asWhite] null means random. */
