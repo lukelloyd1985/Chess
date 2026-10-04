@@ -3,7 +3,7 @@ name: Deploy Appwrite (Functions)
 # Manual only (tap "Run workflow" in the Actions tab) - this pushes the real database table and
 # Function straight to production. See README "Backend setup" for the one-time API key setup.
 #
-# Hard-won notes carried over from the MyTaskList repo, which uses the same deploy pipeline:
+# Hard-won notes on this deploy pipeline:
 # - `appwrite push tables` is NOT used: it repeatedly planned to delete the database outright.
 #   bootstrap-tables.mjs creates missing tables/columns/indexes through the server SDK instead
 #   (additive only, never deletes or alters anything).

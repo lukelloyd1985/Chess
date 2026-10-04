@@ -59,7 +59,7 @@ val downloadNnue by tasks.registering {
 
 android {
     namespace = "com.github.lukelloyd1985.chess"
-    // 36 (not 37): API 37 isn't an installable stable SDK platform yet; see MyTaskList.
+    // 36 (not 37): API 37 isn't an installable stable SDK platform yet.
     compileSdk = 36
     ndkVersion = "27.2.12479018"
 

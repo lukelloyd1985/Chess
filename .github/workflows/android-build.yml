@@ -61,9 +61,9 @@ jobs:
       # on the theory that "Failed to find package 'platforms;android-37'"
       # was just a stale package listing. It wasn't: API 37 genuinely isn't
       # published as an installable stable SDK platform yet (confirmed
-      # against developer.android.com/tools/releases/platforms - see the
-      # MyTaskList repo's gradle/libs.versions.toml for the full
-      # account). compileSdk/targetSdk are back to 36 - see
+      # against developer.android.com/tools/releases/platforms - the
+      # Appwrite SDK pin in gradle/libs.versions.toml is why 37 once
+      # looked necessary). compileSdk/targetSdk are back to 36 - see
       # app/build.gradle.kts - which the default cmdline-tools build
       # already lists, no override needed.
       - name: Install Android SDK platform & build-tools
