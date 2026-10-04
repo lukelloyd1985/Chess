@@ -1,0 +1,1 @@
+-keep class com.github.lukelloyd1985.chess.** { *; }

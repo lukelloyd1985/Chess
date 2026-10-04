@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Chess</string>
+    <!--
+        OAuth *Web application* client ID used for "Sign in with Google" (Credential
+        Manager). When google-services.json is present the generated
+        default_web_client_id is used instead and this value is ignored.
+    -->
+    <string name="google_web_client_id" translatable="false">REPLACE_WITH_WEB_CLIENT_ID</string>
+</resources>
