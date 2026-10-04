@@ -1,0 +1,232 @@
+name: Android Build
+
+on:
+  # Run on demand from the Actions tab to get a debug or release APK for
+  # manual testing - build_type picks which. Never builds the AAB or runs
+  # the Play publish steps either way; those stay scoped to an actual
+  # published GitHub Release below, since they publish to Play Console.
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: APK variant to build
+        required: true
+        default: debug
+        type: choice
+        options:
+          - debug
+          - release
+  # Run automatically whenever a GitHub Release is published, attaching the
+  # signed (if signing secrets are configured) release APK to it.
+  release:
+    types: [published]
+
+concurrency:
+  group: android-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # `if:` conditions can't reference the `secrets` context directly
+      # ("Unrecognized named-value: 'secrets'") - only `env:` blocks can, so
+      # the presence checks below go through these job-level booleans instead.
+      HAS_RELEASE_KEYSTORE_SECRET: ${{ secrets.RELEASE_KEYSTORE_BASE64 != '' }}
+      HAS_DEBUG_KEYSTORE_SECRET: ${{ secrets.DEBUG_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY_SERVICE_ACCOUNT_SECRET: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON != '' }}
+      # Baked into the release build's versionName (see app/build.gradle.kts).
+      # Unused outside release-triggered steps, so harmless on other events.
+      RELEASE_VERSION_NAME: ${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      # A previous version of this step installed platforms;android-37 and
+      # overrode setup-android's cmdline-tools-version to make it visible,
+      # on the theory that "Failed to find package 'platforms;android-37'"
+      # was just a stale package listing. It wasn't: API 37 genuinely isn't
+      # published as an installable stable SDK platform yet (confirmed
+      # against developer.android.com/tools/releases/platforms - see the
+      # MyTaskList repo's gradle/libs.versions.toml for the full
+      # account). compileSdk/targetSdk are back to 36 - see
+      # app/build.gradle.kts - which the default cmdline-tools build
+      # already lists, no override needed.
+      - name: Install Android SDK platform & build-tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      # Stockfish 19 is compiled from source with the NDK/CMake (app/src/main/cpp).
+      - name: Install NDK & CMake
+        run: sdkmanager "ndk;27.2.12479018" "cmake;3.22.1"
+
+      - name: Cache Gradle
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      # Without a signing secret, release builds fall back to the debug
+      # keystore (see app/build.gradle.kts) so a testable APK is always
+      # produced - this just upgrades it to a properly signed release build
+      # when the secrets are present. Relevant for an actual release, and
+      # for a manually-triggered release-variant build (build_type: release).
+      - name: Decode release keystore
+        if: ${{ (github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.build_type == 'release')) && env.HAS_RELEASE_KEYSTORE_SECRET == 'true' }}
+        env:
+          KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
+      # Without this, AGP's built-in debug signing auto-generates a brand
+      # new, random debug.keystore on every run (runners are a fresh VM each
+      # time), so the resulting APK's signing certificate is never the same
+      # twice - Google Sign-In's account-reauth check can never trust an
+      # unregistered, ever-changing certificate. Decoding a stable keystore
+      # here (see README) makes every CI debug build carry the same
+      # signature, so its SHA-1 can be registered with Google once.
+      - name: Decode debug keystore
+        if: ${{ github.event_name == 'workflow_dispatch' && env.HAS_DEBUG_KEYSTORE_SECRET == 'true' }}
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          echo "$DEBUG_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/debug.keystore"
+          echo "DEBUG_KEYSTORE_PATH=$RUNNER_TEMP/debug.keystore" >> "$GITHUB_ENV"
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Rules engine / PGN / analysis maths (pure JVM, fast).
+      - name: Core unit tests
+        run: ./gradlew :core:test --stacktrace
+
+      - name: Build debug APK
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' }}
+        env:
+          DEBUG_KEYSTORE_PASSWORD: ${{ secrets.DEBUG_KEYSTORE_PASSWORD }}
+          # Same APPWRITE_ENDPOINT secret deploy-appwrite.yml uses; the project ID is read from
+          # appwrite/appwrite.json by app/build.gradle.kts, so it is not a secret.
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          # The Google Cloud OAuth 2.0 *Web application* Client ID used by Credential Manager.
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: ./gradlew assembleDebug --stacktrace
+
+      # Builds the sideloadable release APK - for an actual GitHub Release,
+      # or a manually-triggered release-variant build (build_type: release).
+      # Never the AAB here - see "Build release AAB" below for why that
+      # stays scoped to an actual Release only.
+      - name: Build release APK
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.build_type == 'release') }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: ./gradlew assembleRelease --stacktrace
+
+      # The App Bundle Google Play requires for a Play Store upload - only
+      # meaningful for an actual published Release (see the Play publish
+      # steps below), never for a manual build_type: release run, which
+      # exists purely for sideloadable-APK testing.
+      - name: Build release AAB
+        if: ${{ github.event_name == 'release' }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: ./gradlew bundleRelease --stacktrace
+
+      - name: Upload debug APK artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_type == 'debug' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: chess-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      - name: Upload release APK artifact
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.build_type == 'release') }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: chess-release-apk
+          path: app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Upload release AAB artifact
+        if: ${{ github.event_name == 'release' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: chess-release-aab
+          path: app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      - name: Attach release APK + AAB to GitHub Release
+        if: ${{ github.event_name == 'release' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+
+      # Uploads the AAB straight to the Play Console "closed testing"
+      # track - never production, see README "Publishing to Google Play".
+      # Requires the app to already exist in Play Console and its very
+      # first release to have been done manually there; see the README for
+      # why and for the one-time service account setup this secret needs.
+      #
+      # Every `run:` step is a fresh ./gradlew process, so anything
+      # app/build.gradle.kts reads from an env var - signingConfigs.release
+      # AND every APPWRITE_ENDPOINT/GOOGLE_WEB_CLIENT_ID
+      # buildConfigField (each falls back to "" if its env var is unset) -
+      # gets re-read from scratch here, even though the AAB was already
+      # built in the previous step. A missing var isn't just inert: it's a
+      # *different* task input than the one "Build release AAB" saw, so
+      # Gradle reruns generateReleaseBuildConfig (and everything
+      # downstream: compile, sign, bundle) right here with that var
+      # resolved to blank, and *that* silently-rebuilt bundle is what
+      # actually gets published - confirmed the hard way when
+      # APPWRITE_ENDPOINT wasn't in this step's env and the installed
+      # app's BuildConfig.APPWRITE_ENDPOINT fell back to its default. This step
+      # must mirror every env var "Build release AAB" sets, not just
+      # signingConfigs.release's - a missing storePassword the same way
+      # resolves to null while storeFile still resolves (KEYSTORE_PATH
+      # persists job-wide via $GITHUB_ENV, unlike this, which is
+      # step-scoped) and keyAlias is hardcoded so it's unaffected; that
+      # specific case fails loudly (NullPointerException from bundletool),
+      # which is how it was caught before - blank strings elsewhere don't
+      # fail the build at all, they just silently ship broken.
+      - name: Publish to Google Play
+        if: ${{ github.event_name == 'release' && env.HAS_PLAY_SERVICE_ACCOUNT_SECRET == 'true' }}
+        env:
+          ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: ./gradlew publishReleaseBundle --stacktrace
+
+      # Publishes the store listing text and graphics committed under
+      # app/src/main/play/ (title, descriptions, icon, feature graphic,
+      # screenshots - see README "Publishing to Google Play"). Independent
+      # of the release track above; same prerequisite and credentials.
+      - name: Publish Play Store listing
+        if: ${{ github.event_name == 'release' && env.HAS_PLAY_SERVICE_ACCOUNT_SECRET == 'true' }}
+        env:
+          ANDROID_PUBLISHER_CREDENTIALS: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: ./gradlew publishListing --stacktrace
