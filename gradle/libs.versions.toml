@@ -1,5 +1,4 @@
-# Versions mirror the MyTaskList repo, whose CI build is known to work
-# (AGP 9 with built-in Kotlin, Gradle 9.5, compileSdk 36).
+# AGP 9 with built-in Kotlin, Gradle 9.5, compileSdk 36.
 [versions]
 agp = "9.3.0"
 kotlin = "2.4.10"
@@ -11,7 +10,7 @@ lifecycle = "2.8.7"
 navigation = "2.8.5"
 coroutines = "1.9.0"
 # Pinned to 25.2.0 (not 26+/27+) deliberately: 26.0.0 raised compileSdk to 37, which is not an
-# installable stable SDK platform yet. Same pin and reasoning as the MyTaskList repo.
+# installable stable SDK platform yet.
 appwrite = "25.2.0"
 credentials = "1.6.0"
 googleid = "1.2.0"

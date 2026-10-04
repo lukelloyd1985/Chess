@@ -38,7 +38,7 @@ sealed interface SignInResult {
  * token is sent to the `maintenance` Function's /google-sign-in route (see
  * appwrite/functions/maintenance/src/googleSignIn.ts), which verifies it, creates the Appwrite
  * user on first sign-in and returns a one-time token; account.createSession turns that into a
- * session. No Appwrite-hosted page is ever shown. Same flow as the MyTaskList app.
+ * session. No Appwrite-hosted page is ever shown.
  */
 class AuthManager(
     /** False when Appwrite is not set up for this build (see ChessApp.isBackendConfigured). */
