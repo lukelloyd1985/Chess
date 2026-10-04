@@ -1,5 +1,6 @@
 package com.github.lukelloyd1985.chess.ui
 
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,6 +62,13 @@ fun ChessNavHost(app: ChessApp) {
                     val activity = context.findActivity()
                     if (activity != null) scope.launch { app.authManager.signOut(activity) }
                 },
+                onDeleteAccount = {
+                    val activity = context.findActivity()
+                    if (activity != null) scope.launch {
+                        runCatching { app.authManager.deleteAccount(activity) }
+                            .onFailure { Toast.makeText(context, it.message ?: "Could not delete account", Toast.LENGTH_LONG).show() }
+                    }
+                },
             )
         }
 
@@ -72,7 +80,7 @@ fun ChessNavHost(app: ChessApp) {
             OnlineLobbyScreen(
                 user = user,
                 repo = app.onlineRepository,
-                configured = app.authManager.isConfigured,
+                configured = app.isBackendConfigured,
                 onBack = { nav.popBackStack() },
                 onOpenGame = { code -> nav.navigate(gameRoute(GameConfig(GameMode.ONLINE, onlineCode = code))) },
             )

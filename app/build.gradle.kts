@@ -80,15 +80,24 @@ android {
             }
         }
 
-        // Google "Web application" OAuth client ID used by Credential Manager (not a secret).
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+        // The Appwrite project ID isn't sensitive (it only identifies the project and ships inside
+        // the APK regardless), so it is read from appwrite/appwrite.json - the same file the deploy
+        // workflow pushes from - instead of being duplicated in a secret.
+        val appwriteProjectId = Regex("\"projectId\"\\s*:\\s*\"([^\"]*)\"")
+            .find(rootProject.file("appwrite/appwrite.json").readText())
+            ?.groupValues?.get(1) ?: ""
 
-        // Firebase (Auth + Firestore) is initialised manually in ChessApp from these
-        // non-secret identifiers instead of google-services.json + the Gradle plugin.
-        // Project ID, API key and Sender ID are project-level; App ID differs per build type.
-        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${System.getenv("FIREBASE_PROJECT_ID") ?: ""}\"")
-        buildConfigField("String", "FIREBASE_API_KEY", "\"${System.getenv("FIREBASE_API_KEY") ?: ""}\"")
-        buildConfigField("String", "FIREBASE_SENDER_ID", "\"${System.getenv("FIREBASE_SENDER_ID") ?: ""}\"")
+        // The remaining IDs are fixed names this codebase chose, matching appwrite.json's $id fields.
+        buildConfigField("String", "APPWRITE_ENDPOINT", "\"${System.getenv("APPWRITE_ENDPOINT") ?: "https://cloud.appwrite.io/v1"}\"")
+        buildConfigField("String", "APPWRITE_PROJECT_ID", "\"$appwriteProjectId\"")
+        buildConfigField("String", "APPWRITE_DATABASE_ID", "\"${System.getenv("APPWRITE_DATABASE_ID") ?: "chess"}\"")
+        buildConfigField("String", "APPWRITE_COLLECTION_GAMES_ID", "\"${System.getenv("APPWRITE_COLLECTION_GAMES_ID") ?: "games"}\"")
+        buildConfigField("String", "APPWRITE_FUNCTION_MAINTENANCE_ID", "\"${System.getenv("APPWRITE_FUNCTION_MAINTENANCE_ID") ?: "maintenance"}\"")
+
+        // Google Cloud OAuth 2.0 *Web application* Client ID. Credential Manager mints the ID token
+        // for it, and the maintenance Function verifies that token's audience against the same
+        // value. Not a secret.
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
     }
 
     signingConfigs {
@@ -104,7 +113,7 @@ android {
         }
         // CI runners are fresh VMs, so AGP would generate a new random debug keystore on every
         // build and Google Sign-In would reject the ever-changing certificate. A stable keystore
-        // from CI lets its SHA-1 be registered in Firebase once.
+        // from CI lets its SHA-1 be registered with Google once.
         getByName("debug") {
             val keystorePath = System.getenv("DEBUG_KEYSTORE_PATH")
             if (!keystorePath.isNullOrBlank()) {
@@ -129,8 +138,6 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            // The .debug package is its own registered Firebase Android app, so own App ID.
-            buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${System.getenv("FIREBASE_APPLICATION_ID_DEBUG") ?: ""}\"")
         }
         release {
             isMinifyEnabled = true
@@ -143,7 +150,6 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${System.getenv("FIREBASE_APPLICATION_ID") ?: ""}\"")
         }
     }
 
@@ -194,11 +200,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.play.services)
 
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth)
-    implementation(libs.firebase.firestore)
+    implementation(libs.appwrite)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play)
     implementation(libs.googleid)

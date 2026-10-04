@@ -48,10 +48,12 @@ fun HomeScreen(
     onPassAndPlay: () -> Unit,
     onOpenAnalysis: (String) -> Unit,
     onSignOut: () -> Unit,
+    onDeleteAccount: () -> Unit,
 ) {
     val context = LocalContext.current
     var games by remember { mutableStateOf(store.all()) }
     var showImport by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 16.dp)) {
         Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -59,6 +61,7 @@ fun HomeScreen(
                 Text("Chess", fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Text(user?.let { "Signed in as ${it.name}" } ?: "Guest", color = Muted, fontSize = 13.sp)
             }
+            if (user != null) TextButton(onClick = { confirmDelete = true }) { Text("Delete account", color = Muted) }
             TextButton(onClick = onSignOut) { Text(if (user != null) "Sign out" else "Sign in") }
         }
 
@@ -81,6 +84,16 @@ fun HomeScreen(
                 })
             }
         }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete your account?") },
+            text = { Text("This permanently deletes your account and your online games. Games saved on this device stay.") },
+            confirmButton = { TextButton(onClick = { confirmDelete = false; onDeleteAccount() }) { Text("Delete") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
+        )
     }
 
     if (showImport) {

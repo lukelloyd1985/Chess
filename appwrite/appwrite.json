@@ -1,0 +1,68 @@
+{
+  "projectId": "REPLACE_WITH_APPWRITE_PROJECT_ID",
+  "projectName": "Chess",
+  "databases": [
+    {
+      "$id": "chess",
+      "name": "Chess",
+      "enabled": true
+    }
+  ],
+  "tables": [
+    {
+      "$id": "games",
+      "$permissions": [
+        "create(\"users\")"
+      ],
+      "databaseId": "chess",
+      "name": "games",
+      "enabled": true,
+      "rowSecurity": true,
+      "columns": [
+        { "key": "whiteUid", "type": "string", "required": false, "array": false, "size": 255, "default": null },
+        { "key": "blackUid", "type": "string", "required": false, "array": false, "size": 255, "default": null },
+        { "key": "whiteName", "type": "string", "required": false, "array": false, "size": 255, "default": null },
+        { "key": "blackName", "type": "string", "required": false, "array": false, "size": 255, "default": null },
+        { "key": "moves", "type": "string", "required": false, "array": false, "size": 32768, "default": null },
+        {
+          "key": "status",
+          "type": "enum",
+          "required": false,
+          "array": false,
+          "elements": ["waiting", "active", "finished"],
+          "default": "waiting"
+        },
+        { "key": "result", "type": "string", "required": false, "array": false, "size": 16, "default": null },
+        { "key": "reason", "type": "string", "required": false, "array": false, "size": 32, "default": null },
+        { "key": "drawOfferBy", "type": "string", "required": false, "array": false, "size": 255, "default": null }
+      ],
+      "indexes": [
+        { "key": "whiteUid_idx", "type": "key", "status": "available", "attributes": ["whiteUid"], "orders": ["ASC"] },
+        { "key": "blackUid_idx", "type": "key", "status": "available", "attributes": ["blackUid"], "orders": ["ASC"] }
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "$id": "maintenance",
+      "name": "maintenance",
+      "runtime": "node-22",
+      "execute": [
+        "any"
+      ],
+      "events": [],
+      "scopes": [
+        "rows.read",
+        "rows.write",
+        "users.read",
+        "users.write"
+      ],
+      "schedule": "",
+      "timeout": 60,
+      "entrypoint": "dist/main.js",
+      "commands": "npm install && npm run build",
+      "specification": "s-0.5vcpu-512mb",
+      "path": "functions/maintenance"
+    }
+  ]
+}

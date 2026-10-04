@@ -1,16 +1,24 @@
 package com.github.lukelloyd1985.chess.data
 
-import android.content.Context
+import com.github.lukelloyd1985.chess.BuildConfig
 import com.github.lukelloyd1985.chess.auth.UserProfile
-import com.google.firebase.FirebaseApp
-import com.google.firebase.firestore.FieldValue
-import com.google.firebase.firestore.FirebaseFirestore
+import io.appwrite.Channel
+import io.appwrite.Permission
+import io.appwrite.Query
+import io.appwrite.Role
+import io.appwrite.exceptions.AppwriteException
+import io.appwrite.models.Document
+import io.appwrite.services.Databases
+import io.appwrite.services.Functions
+import io.appwrite.services.Realtime
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.launch
+import org.json.JSONException
+import org.json.JSONObject
 
-/** A friend game stored in Firestore under games/{code}. */
+/** A friend game stored in the Appwrite `games` table; the row ID is the 6-character share code. */
 data class OnlineGame(
     val code: String,
     val whiteUid: String?,
@@ -34,178 +42,161 @@ data class OnlineGame(
 }
 
 /**
- * Friend games over Firestore: one player creates a game and shares its
- * 6-character code, the other joins with it. Moves are appended to a shared
- * list with transactions so both devices stay in sync.
+ * Friend games over Appwrite: one player creates a game row and shares its code, the other joins
+ * through the `maintenance` Function (which seats them and widens the row's permissions). Moves
+ * are appended to the shared row and both devices follow it through Realtime.
  */
-class OnlineRepository(private val context: Context) {
-    private val available: Boolean get() = FirebaseApp.getApps(context).isNotEmpty()
-    private val db: FirebaseFirestore get() = FirebaseFirestore.getInstance()
-    private val games get() = db.collection("games")
-
-    private fun requireAvailable() {
-        check(available) { "Online play needs Firebase. Set the FIREBASE_* values (see README) and rebuild." }
-    }
+class OnlineRepository(
+    private val databases: Databases,
+    private val realtime: Realtime,
+    private val functions: Functions,
+) {
+    private val databaseId = BuildConfig.APPWRITE_DATABASE_ID
+    private val gamesId = BuildConfig.APPWRITE_COLLECTION_GAMES_ID
 
     /** Creates a waiting game and returns its share code. [asWhite] null means random. */
     suspend fun createGame(user: UserProfile, asWhite: Boolean?): String {
-        requireAvailable()
         val white = asWhite ?: (System.nanoTime() % 2 == 0L)
         repeat(8) {
             val code = newCode()
-            val ref = games.document(code)
-            val created = db.runTransaction { tx ->
-                if (tx.get(ref).exists()) return@runTransaction false
-                tx.set(
-                    ref,
-                    hashMapOf(
-                        "whiteUid" to if (white) user.uid else null,
-                        "blackUid" to if (white) null else user.uid,
+            try {
+                databases.createDocument(
+                    databaseId = databaseId,
+                    collectionId = gamesId,
+                    documentId = code,
+                    data = mapOf(
+                        "whiteUid" to if (white) user.uid else "",
+                        "blackUid" to if (white) "" else user.uid,
                         "whiteName" to if (white) user.name else "Waiting…",
                         "blackName" to if (white) "Waiting…" else user.name,
-                        "players" to listOf(user.uid),
-                        "moves" to emptyList<String>(),
+                        "moves" to "",
                         "status" to "waiting",
-                        "result" to null,
-                        "reason" to null,
-                        "drawOfferBy" to null,
-                        "createdAt" to FieldValue.serverTimestamp(),
-                        "updatedAt" to FieldValue.serverTimestamp(),
+                        "drawOfferBy" to "",
+                    ),
+                    permissions = listOf(
+                        Permission.read(Role.user(user.uid)),
+                        Permission.update(Role.user(user.uid)),
+                        Permission.delete(Role.user(user.uid)),
                     ),
                 )
-                true
-            }.await()
-            if (created) return code
+                return code
+            } catch (e: AppwriteException) {
+                if (e.code != 409) throw e // 409 = code already taken: try another
+            }
         }
         error("Could not allocate a game code, please try again")
     }
 
-    /** Joins the open seat of game [rawCode]; rejoining your own game is allowed. */
-    suspend fun joinGame(user: UserProfile, rawCode: String): String {
-        requireAvailable()
+    /** Joins the open seat of game [rawCode] (rejoining your own game is allowed); returns its code. */
+    suspend fun joinGame(rawCode: String): String {
         val code = rawCode.trim().uppercase()
-        val ref = games.document(code)
-        db.runTransaction { tx ->
-            val snap = tx.get(ref)
-            check(snap.exists()) { "No game with code $code" }
-            val white = snap.getString("whiteUid")
-            val black = snap.getString("blackUid")
-            if (user.uid == white || user.uid == black) return@runTransaction Unit
-            check(white == null || black == null) { "That game already has two players" }
-            val joinsAsWhite = white == null
-            val update = hashMapOf<String, Any?>(
-                "players" to FieldValue.arrayUnion(user.uid),
-                "status" to "active",
-                "updatedAt" to FieldValue.serverTimestamp(),
-            )
-            if (joinsAsWhite) {
-                update["whiteUid"] = user.uid
-                update["whiteName"] = user.name
-            } else {
-                update["blackUid"] = user.uid
-                update["blackName"] = user.name
-            }
-            tx.update(ref, update)
-            Unit
-        }.await()
+        val execution = functions.createExecution(
+            functionId = BuildConfig.APPWRITE_FUNCTION_MAINTENANCE_ID,
+            body = JSONObject().put("code", code).toString(),
+            path = "/join-game",
+        )
+        if (execution.responseBody.isBlank()) {
+            error("Could not join: empty response from the server (status=${execution.status})")
+        }
+        val body = try {
+            JSONObject(execution.responseBody)
+        } catch (e: JSONException) {
+            error("Could not join: unexpected response from the server")
+        }
+        if (!body.optBoolean("success", false)) error(body.optString("message", "Could not join that game"))
         return code
     }
 
     fun observe(code: String): Flow<OnlineGame?> = callbackFlow {
-        requireAvailable()
-        val reg = games.document(code).addSnapshotListener { snap, err ->
-            if (err != null) {
-                close(err)
-                return@addSnapshotListener
+        suspend fun refresh() {
+            try {
+                trySend(databases.getDocument(databaseId, gamesId, code).toGame())
+            } catch (e: AppwriteException) {
+                if (e.code == 404 || e.code == 401) trySend(null) else close(e)
+            } catch (t: Throwable) {
+                close(t)
             }
-            trySend(snap?.takeIf { it.exists() }?.let { parse(code, it.data.orEmpty()) })
         }
-        awaitClose { reg.remove() }
+        refresh()
+        // Realtime subscribes at table granularity; filter to this game before refetching.
+        val subscription = realtime.subscribe(Channel.tablesdb(databaseId).table(gamesId).row()) { response ->
+            @Suppress("UNCHECKED_CAST")
+            val payload = response.payload as? Map<String, Any?>
+            val id = payload?.get("\$id") as? String
+            if (id == null || id == code) launch { refresh() }
+        }
+        awaitClose { subscription.close() }
     }
 
-    fun observeMyGames(uid: String): Flow<List<OnlineGame>> = callbackFlow {
-        requireAvailable()
-        val reg = games.whereArrayContains("players", uid)
-            .limit(30)
-            .addSnapshotListener { snap, err ->
-                if (err != null) {
-                    close(err)
-                    return@addSnapshotListener
-                }
-                trySend(snap?.documents?.map { parse(it.id, it.data.orEmpty()) }.orEmpty())
+    fun observeMyGames(): Flow<List<OnlineGame>> = callbackFlow {
+        suspend fun refresh() {
+            try {
+                // Row-level permissions mean this only returns games the signed-in user is seated in.
+                val result = databases.listDocuments(
+                    databaseId,
+                    gamesId,
+                    queries = listOf(Query.orderDesc("\$updatedAt"), Query.limit(30)),
+                )
+                trySend(result.documents.map { it.toGame() })
+            } catch (t: Throwable) {
+                close(t)
             }
-        awaitClose { reg.remove() }
+        }
+        refresh()
+        val subscription = realtime.subscribe(Channel.tablesdb(databaseId).table(gamesId).row()) { launch { refresh() } }
+        awaitClose { subscription.close() }
     }
 
     /** Appends [uci] if the shared move list still has exactly [expectedPly] moves and it is [uid]'s turn. */
     suspend fun submitMove(code: String, uid: String, uci: String, expectedPly: Int) {
-        requireAvailable()
-        val ref = games.document(code)
-        db.runTransaction { tx ->
-            val snap = tx.get(ref)
-            val g = parse(code, snap.data.orEmpty())
-            check(g.status == "active") { "Game is not active" }
-            check(g.moves.size == expectedPly) { "Out of sync, the position changed" }
-            val whiteTurn = g.moves.size % 2 == 0
-            check(g.colorOf(uid) == whiteTurn) { "Not your turn" }
-            tx.update(
-                ref,
-                mapOf(
-                    "moves" to g.moves + uci,
-                    "drawOfferBy" to null,
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                ),
-            )
-            Unit
-        }.await()
+        val g = databases.getDocument(databaseId, gamesId, code).toGame()
+        check(g.status == "active") { "Game is not active" }
+        check(g.moves.size == expectedPly) { "Out of sync, the position changed" }
+        val whiteTurn = g.moves.size % 2 == 0
+        check(g.colorOf(uid) == whiteTurn) { "Not your turn" }
+        databases.updateDocument(
+            databaseId, gamesId, code,
+            mapOf("moves" to (g.moves + uci).joinToString(" "), "drawOfferBy" to ""),
+        )
     }
 
     suspend fun finish(code: String, result: String, reason: String) {
-        requireAvailable()
-        val ref = games.document(code)
-        db.runTransaction { tx ->
-            val snap = tx.get(ref)
-            if (snap.getString("status") == "finished") return@runTransaction Unit
-            tx.update(
-                ref,
-                mapOf(
-                    "status" to "finished",
-                    "result" to result,
-                    "reason" to reason,
-                    "drawOfferBy" to null,
-                    "updatedAt" to FieldValue.serverTimestamp(),
-                ),
-            )
-            Unit
-        }.await()
+        val g = databases.getDocument(databaseId, gamesId, code).toGame()
+        if (g.status == "finished") return
+        databases.updateDocument(
+            databaseId, gamesId, code,
+            mapOf("status" to "finished", "result" to result, "reason" to reason, "drawOfferBy" to ""),
+        )
     }
 
     suspend fun offerDraw(code: String, uid: String) {
-        requireAvailable()
-        games.document(code).update(mapOf("drawOfferBy" to uid, "updatedAt" to FieldValue.serverTimestamp())).await()
+        databases.updateDocument(databaseId, gamesId, code, mapOf("drawOfferBy" to uid))
     }
 
     suspend fun declineDraw(code: String) {
-        requireAvailable()
-        games.document(code).update(mapOf("drawOfferBy" to null, "updatedAt" to FieldValue.serverTimestamp())).await()
+        databases.updateDocument(databaseId, gamesId, code, mapOf("drawOfferBy" to ""))
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun parse(code: String, d: Map<String, Any?>): OnlineGame = OnlineGame(
-        code = code,
-        whiteUid = d["whiteUid"] as? String,
-        blackUid = d["blackUid"] as? String,
-        whiteName = d["whiteName"] as? String ?: "White",
-        blackName = d["blackName"] as? String ?: "Black",
-        moves = (d["moves"] as? List<String>).orEmpty(),
-        status = d["status"] as? String ?: "waiting",
-        result = d["result"] as? String,
-        reason = d["reason"] as? String,
-        drawOfferBy = d["drawOfferBy"] as? String,
-    )
+    private fun Document<Map<String, Any>>.toGame(): OnlineGame {
+        val f = data
+        fun str(key: String): String? = (f[key] as? String)?.takeIf { it.isNotEmpty() }
+        return OnlineGame(
+            code = id,
+            whiteUid = str("whiteUid"),
+            blackUid = str("blackUid"),
+            whiteName = str("whiteName") ?: "White",
+            blackName = str("blackName") ?: "Black",
+            moves = str("moves")?.split(' ')?.filter { it.isNotEmpty() }.orEmpty(),
+            status = str("status") ?: "waiting",
+            result = str("result"),
+            reason = str("reason"),
+            drawOfferBy = str("drawOfferBy"),
+        )
+    }
 
     private fun newCode(): String {
         val alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789" // no ambiguous 0/O/1/I
-        return (1..6).map { alphabet[java.security.SecureRandom().nextInt(alphabet.length)] }.joinToString("")
+        val rng = java.security.SecureRandom()
+        return (1..6).map { alphabet[rng.nextInt(alphabet.length)] }.joinToString("")
     }
 }

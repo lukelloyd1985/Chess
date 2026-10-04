@@ -1,0 +1,135 @@
+name: Deploy Appwrite (Functions)
+
+# Manual only (tap "Run workflow" in the Actions tab) - this pushes the real database table and
+# Function straight to production. See README "Backend setup" for the one-time API key setup.
+#
+# Hard-won notes carried over from the MyTaskList repo, which uses the same deploy pipeline:
+# - `appwrite push tables` is NOT used: it repeatedly planned to delete the database outright.
+#   bootstrap-tables.mjs creates missing tables/columns/indexes through the server SDK instead
+#   (additive only, never deletes or alters anything).
+# - `appwrite push function` needs the API key scoped to "rules.read" too (listed under the
+#   "Proxy" category of Console's scope picker).
+# - The Function's own `scopes` in appwrite.json must use "rows.read"/"rows.write" (TablesDB).
+# - The runtime is "node-22" ("node-24" is rejected on some plans), and each function's tsconfig
+#   is fully inlined (no `extends`) and builds with `node node_modules/typescript/bin/tsc`
+#   because Appwrite's build container can't resolve the .bin/tsc shim or parent directories.
+# - `appwrite push function` exits 0 even if a deployment failed, so the step below greps its
+#   output for a nonzero "N failed" count.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+
+      - name: Install Appwrite CLI
+        run: npm install -g appwrite-cli
+
+      # The project ID isn't sensitive (it only identifies the project -
+      # no access without the API key below - and ships inside the built
+      # APK regardless), so unlike APPWRITE_ENDPOINT/APPWRITE_API_KEY it's
+      # not a GitHub secret: it's read straight from appwrite.json's own
+      # "projectId" field, the same file `appwrite push` itself reads it
+      # from (confirmed by a real run: authenticating with a correct
+      # secret still failed pushing with "Project ... could not be found"
+      # while a placeholder sat in this file - `appwrite push` doesn't use
+      # the authenticated client session's project for that). This also
+      # means the Android app (app/build.gradle.kts) and this workflow now
+      # share one source of truth instead of each needing their own copy
+      # of the same value - see README "Backend setup".
+      - name: Authenticate with Appwrite
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+        run: |
+          appwrite client \
+            --endpoint "$APPWRITE_ENDPOINT" \
+            --project-id "$(jq -r '.projectId' appwrite/appwrite.json)" \
+            --key "$APPWRITE_API_KEY"
+
+      - name: Install function dependencies
+        run: |
+          for dir in appwrite/functions/*/; do
+            (cd "$dir" && npm install)
+          done
+
+      - name: Install bootstrap script dependencies
+        working-directory: appwrite
+        run: npm install
+
+      # See the top-of-file WARNING and bootstrap-tables.mjs's own header
+      # comment for why this exists and what it actually does: creates
+      # missing tables and adds missing columns/indexes to existing ones,
+      # bypassing `appwrite push tables`'s repeatedly-destructive
+      # behavior entirely. Never deletes or alters anything - safe to run
+      # against real data.
+      - name: Bootstrap database and tables
+        working-directory: appwrite
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+        run: npm run bootstrap-tables
+
+      # Only functions go through `appwrite push` - see the top-of-file
+      # WARNING for why `appwrite push tables` is not run here at all.
+      #
+      # `appwrite push function` exits 0 even when one function's
+      # deployment fails and another's succeeds - a real run logged
+      # "Deployed 1 of 2 functions in 604.7s. 1 failed." and the workflow
+      # still went green. The CLI's own exit code can't be trusted for
+      # this, so the step greps its output for a nonzero "N failed" count
+      # and fails the step explicitly if it finds one - `set -o pipefail`
+      # also catches a real nonzero exit from `appwrite` itself, which
+      # `tee` would otherwise swallow.
+      - name: Push functions
+        working-directory: appwrite
+        run: |
+          set -o pipefail
+          appwrite push function all --force 2>&1 | tee /tmp/push-functions.log
+          if grep -qE '[1-9][0-9]* failed' /tmp/push-functions.log; then
+            echo "::error::appwrite push function reported one or more failed deployments - see log above."
+            exit 1
+          fi
+
+      # `appwrite push function` only syncs a Function's code and
+      # appwrite.json-declared config (entrypoint, scopes, events, etc.) -
+      # it never touches Function environment variables, which aren't
+      # part of appwrite.json at all. Without this step,
+      # GOOGLE_WEB_CLIENT_ID has to be set by hand in Console after every
+      # fresh project setup - see set-function-variables.mjs's own header
+      # comment. Idempotent - safe to run on every deploy. Reuses the same
+      # GOOGLE_WEB_CLIENT_ID secret android-build.yml already
+      # passes to the Android build (same literal Client ID value both
+      # sides need to agree on - see README "Backend setup" step 6.3).
+      - name: Set maintenance Function variables
+        working-directory: appwrite
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
+        run: npm run set-function-variables
+
+      # `appwrite push function` uploads a new deployment and activates it
+      # on every run, but never deletes the ones it replaces - left alone,
+      # every manual redeploy leaves one more inactive deployment sitting
+      # in Console forever (Appwrite's own deploymentRetention setting
+      # defaults to 0 = keep everything). See prune-function-deployments.mjs's
+      # own header comment.
+      - name: Prune old Function deployments
+        working-directory: appwrite
+        env:
+          APPWRITE_ENDPOINT: ${{ secrets.APPWRITE_ENDPOINT }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+        run: npm run prune-function-deployments

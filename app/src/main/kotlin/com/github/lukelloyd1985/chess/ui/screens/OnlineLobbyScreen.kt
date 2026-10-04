@@ -48,9 +48,9 @@ fun OnlineLobbyScreen(
     var myGames by remember { mutableStateOf<List<OnlineGame>>(emptyList()) }
 
     LaunchedEffect(user?.uid) {
-        val uid = user?.uid ?: return@LaunchedEffect
+        if (user == null) return@LaunchedEffect
         if (!configured) return@LaunchedEffect
-        repo.observeMyGames(uid).catch { error = it.message }.collect { myGames = it }
+        repo.observeMyGames().catch { error = it.message }.collect { myGames = it }
     }
 
     Column(Modifier.fillMaxSize().systemBarsPadding().padding(horizontal = 16.dp)) {
@@ -58,7 +58,7 @@ fun OnlineLobbyScreen(
 
         if (user == null || !configured) {
             Text(
-                if (!configured) "Online play needs Firebase. Set the FIREBASE_* build values (see README)."
+                if (!configured) "Online play needs Appwrite. Set the project ID in appwrite/appwrite.json (see README)."
                 else "Sign in with Google to play friends online.",
                 color = Muted,
                 modifier = Modifier.padding(16.dp),
@@ -103,7 +103,7 @@ fun OnlineLobbyScreen(
                 error = null
                 scope.launch {
                     try {
-                        onOpenGame(repo.joinGame(user, code))
+                        onOpenGame(repo.joinGame(code))
                     } catch (e: Exception) {
                         error = e.message
                     }

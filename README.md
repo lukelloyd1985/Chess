@@ -3,9 +3,9 @@
 An Android chess app in the style of chess.com, powered by **Stockfish 19**.
 
 * **Play bots** – 9 computer opponents from ~400 to 3190 Elo (Stockfish's `UCI_Elo` limiter, think-time limits and deliberate "sloppiness" for the beginner levels), with undo, hints, optional clocks and increments.
-* **Play friends** – online games shared by a 6-character code (Firestore), plus pass-and-play on one device.
+* **Play friends** – online games shared by a 6-character code (Appwrite), plus pass-and-play on one device.
 * **Unlimited game analysis** – every finished or imported (PGN) game can be reviewed as often as you like: per-move classification (best → blunder), accuracy for both sides, eval bar and graph, engine lines, best-move arrows, three analysis depths. Nothing is capped or paywalled.
-* **Sign in with Google** – Credential Manager + Firebase Auth. Guests can still play offline.
+* **Sign in with Google** – Credential Manager bridged into an Appwrite session (same flow as MyTaskList). Guests can still play offline.
 
 Application ID / package: `com.github.lukelloyd1985.chess`
 
@@ -30,33 +30,43 @@ Stockfish 19 needs its NNUE network (`nn-1a298aa575a0.nnue`). The build download
 `tests.stockfishchess.org` and verifies the SHA-256 prefix. To build offline, put the file in `app/nnue/`.
 Only 64-bit ABIs (`arm64-v8a`, `x86_64`) are built.
 
-## CI (`.github/workflows/android-build.yml`)
+## CI
 
-Copied from MyTaskList. Run it from the Actions tab (`debug` or `release` APK), or publish a GitHub
-Release to build the signed release APK + AAB, attach them to the release and upload to Google Play's
-closed-testing track. Repository secrets (all optional unless you want that feature):
+Both workflows are copied from MyTaskList and run from the Actions tab.
 
-| Secret | Purpose |
-| --- | --- |
-| `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY`, `FIREBASE_SENDER_ID` | Firebase project values (shared by debug + release) |
-| `FIREBASE_APPLICATION_ID` / `FIREBASE_APPLICATION_ID_DEBUG` | Firebase App ID of the `com.github.lukelloyd1985.chess` / `.debug` Android app |
-| `GOOGLE_WEB_CLIENT_ID` | OAuth **Web application** client ID used by Credential Manager |
-| `DEBUG_KEYSTORE_BASE64`, `DEBUG_KEYSTORE_PASSWORD` | Stable debug keystore (alias `chessdebug`) so its SHA-1 can be registered once |
-| `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD` | Release keystore (alias `chess`) |
-| `PLAY_SERVICE_ACCOUNT_JSON` | Play Console service account key for publishing |
+* `android-build.yml` - `debug` or `release` APK on demand; publishing a GitHub Release builds the signed release APK + AAB,
+  attaches them to the release and uploads to Google Play's closed-testing track.
+* `deploy-appwrite.yml` - creates/updates the database table (via `bootstrap-tables.mjs`, additive only), pushes the
+  `maintenance` Function, sets its `GOOGLE_WEB_CLIENT_ID` variable and prunes old deployments.
 
-Without the Firebase secrets the app still builds and plays offline; sign-in and online games show "not configured".
+Repository secrets (optional unless you want that feature):
 
-## Firebase setup (Google sign-in & online play)
+| Secret | Used by | Purpose |
+| --- | --- | --- |
+| `APPWRITE_ENDPOINT` | both | e.g. `https://fra.cloud.appwrite.io/v1` |
+| `APPWRITE_API_KEY` | deploy | Server API key (scopes: databases/tables + columns + indexes read/write, functions read/write, `rules.read`, execution/variables) |
+| `GOOGLE_WEB_CLIENT_ID` | both | OAuth **Web application** client ID - the app and the Function must agree on it |
+| `DEBUG_KEYSTORE_BASE64`, `DEBUG_KEYSTORE_PASSWORD` | build | Stable debug keystore (alias `chessdebug`) so its SHA-1 can be registered once |
+| `RELEASE_KEYSTORE_BASE64`, `RELEASE_KEYSTORE_PASSWORD` | build | Release keystore (alias `chess`) |
+| `PLAY_SERVICE_ACCOUNT_JSON` | build | Play Console service account key for publishing |
 
-1. Create a Firebase project; register two Android apps: `com.github.lukelloyd1985.chess` and
-   `com.github.lukelloyd1985.chess.debug`, each with its signing SHA-1. Skip the `google-services.json` download -
-   the app initialises Firebase manually from the secrets above.
-2. Enable **Authentication -> Google** and **Firestore**, and publish `firestore.rules`.
-3. In Google Cloud Console create the OAuth **Web application** client (`GOOGLE_WEB_CLIENT_ID`). The "Android key
-   (auto created by Firebase)" is `FIREBASE_API_KEY`.
+The Appwrite project ID is not secret: set `"projectId"` in `appwrite/appwrite.json` (the app and the deploy workflow both
+read it from there). Until you do, sign-in and online play report "not configured"; offline play works regardless.
 
-Notes on online play: moves are validated by the clients (Firestore rules enforce turn order and one-move-at-a-time appends, but cannot validate chess legality), and online games are untimed.
+## Backend setup (Appwrite)
+
+1. Create an Appwrite Cloud project, put its ID in `appwrite/appwrite.json`, and add `APPWRITE_ENDPOINT` / `APPWRITE_API_KEY`
+   as repository secrets.
+2. Console -> **Add Platform -> Android** twice: `com.github.lukelloyd1985.chess` and `com.github.lukelloyd1985.chess.debug`.
+3. In Google Cloud Console create an OAuth **Web application** client (-> `GOOGLE_WEB_CLIENT_ID`) plus Android clients for each
+   package name + signing SHA-1 (debug keystore, release keystore, and Play App Signing's certificate).
+4. Run **Deploy Appwrite (Functions)**. It creates the `chess` database and `games` table and deploys `maintenance`
+   (Google sign-in, join-game, delete-account).
+
+How online play works: the creator makes a `games` row whose ID is the share code; the friend "joins" through the
+`maintenance` Function, which seats them and widens the row's permissions to both players. Moves are appended to the shared
+row by the players' devices and followed through Realtime. Moves are validated by the clients only (Appwrite permissions
+restrict the row to its two players but cannot check chess legality), and online games are untimed.
 
 ## Publishing to Google Play
 
