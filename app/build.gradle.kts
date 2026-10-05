@@ -132,7 +132,9 @@ android {
         }
     }
 
-    sourceSets.getByName("main").assets.srcDir(nnueOutDir)
+    // AGP 9 rejects Provider instances in the SourceSet API, so pass the plain directory. The
+    // task dependency is carried by the merge*Assets wiring on downloadNnue below.
+    sourceSets.getByName("main").assets.srcDir(nnueOutDir.get().asFile)
 
     buildTypes {
         debug {
