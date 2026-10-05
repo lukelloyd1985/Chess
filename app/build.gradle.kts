@@ -1,3 +1,4 @@
+import java.net.URI
 import java.security.MessageDigest
 
 plugins {
@@ -52,7 +53,7 @@ abstract class DownloadNnueTask : DefaultTask() {
             var ok = false
             for (u in listOf("https://tests.stockfishchess.org/api/nn/$name", "https://data.stockfishchess.org/nn/$name")) {
                 try {
-                    java.net.URI(u).toURL().openStream().use { input -> target.outputStream().use { input.copyTo(it) } }
+                    URI(u).toURL().openStream().use { input -> target.outputStream().use { input.copyTo(it) } }
                     if (valid(target, prefix)) { ok = true; break }
                 } catch (e: Exception) {
                     logger.warn("Could not download $u: ${e.message}")
