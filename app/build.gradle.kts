@@ -7,54 +7,69 @@ plugins {
     alias(libs.plugins.play.publisher)
 }
 
-// Stockfish 19 needs its NNUE network file. It is downloaded at build time (the
-// file name contains the first 12 hex chars of its SHA-256, which we verify) and
-// bundled as an asset. Drop a copy in app/nnue/ to build offline.
-val nnueName = "nn-1a298aa575a0.nnue"
-val nnueOutDir = layout.buildDirectory.dir("generated/nnue")
+// Stockfish 19 needs its NNUE network file. It is downloaded at build time (the file name
+// contains the first 12 hex chars of its SHA-256, which we verify) and bundled as an asset.
+// Drop a copy in app/nnue/ to build offline.
+//
+// This is a typed task registered through the variant API (see androidComponents below) so that
+// every task reading the generated assets (merge, lint, ...) automatically depends on it.
+abstract class DownloadNnueTask : DefaultTask() {
+    @get:Input
+    abstract val nnueName: Property<String>
 
-val downloadNnue by tasks.registering {
-    val outFile = nnueOutDir.map { it.file(nnueName) }
-    val localCopy = file("nnue/$nnueName")
-    outputs.file(outFile)
-    doLast {
-        val target = outFile.get().asFile
-        target.parentFile.mkdirs()
-        fun valid(f: File): Boolean {
-            if (!f.exists()) return false
-            val md = MessageDigest.getInstance("SHA-256")
-            f.inputStream().use { input ->
-                val buf = ByteArray(1 shl 16)
-                while (true) {
-                    val n = input.read(buf)
-                    if (n < 0) break
-                    md.update(buf, 0, n)
-                }
+    @get:Optional
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.NONE)
+    abstract val localCopy: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    private fun valid(f: File, expectedPrefix: String): Boolean {
+        if (!f.exists()) return false
+        val md = MessageDigest.getInstance("SHA-256")
+        f.inputStream().use { input ->
+            val buf = ByteArray(1 shl 16)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                md.update(buf, 0, n)
             }
-            val hex = md.digest().joinToString("") { "%02x".format(it) }
-            return hex.startsWith(nnueName.removePrefix("nn-").removeSuffix(".nnue"))
         }
-        if (valid(target)) return@doLast
-        if (localCopy.exists()) {
-            localCopy.copyTo(target, overwrite = true)
+        return md.digest().joinToString("") { "%02x".format(it) }.startsWith(expectedPrefix)
+    }
+
+    @TaskAction
+    fun download() {
+        val name = nnueName.get()
+        val prefix = name.removePrefix("nn-").removeSuffix(".nnue")
+        val dir = outputDir.get().asFile.apply { mkdirs() }
+        val target = File(dir, name)
+        if (valid(target, prefix)) return
+        if (localCopy.isPresent) {
+            localCopy.get().asFile.copyTo(target, overwrite = true)
         } else {
-            val urls = listOf(
-                "https://tests.stockfishchess.org/api/nn/$nnueName",
-                "https://data.stockfishchess.org/nn/$nnueName",
-            )
             var ok = false
-            for (u in urls) {
+            for (u in listOf("https://tests.stockfishchess.org/api/nn/$name", "https://data.stockfishchess.org/nn/$name")) {
                 try {
-                    uri(u).toURL().openStream().use { input -> target.outputStream().use { input.copyTo(it) } }
-                    if (valid(target)) { ok = true; break }
+                    java.net.URI(u).toURL().openStream().use { input -> target.outputStream().use { input.copyTo(it) } }
+                    if (valid(target, prefix)) { ok = true; break }
                 } catch (e: Exception) {
                     logger.warn("Could not download $u: ${e.message}")
                 }
             }
-            if (!ok) throw GradleException("Could not obtain $nnueName. Download it from https://tests.stockfishchess.org/api/nn/$nnueName into app/nnue/ and rebuild.")
+            if (!ok) throw GradleException("Could not obtain $name. Download it from https://tests.stockfishchess.org/api/nn/$name into app/nnue/ and rebuild.")
         }
-        if (!valid(target)) throw GradleException("$nnueName failed its checksum")
+        if (!valid(target, prefix)) throw GradleException("$name failed its checksum")
     }
+}
+
+val nnueFileName = "nn-1a298aa575a0.nnue"
+
+val downloadNnue = tasks.register<DownloadNnueTask>("downloadNnue") {
+    nnueName.set(nnueFileName)
+    file("nnue/$nnueFileName").takeIf { it.exists() }?.let { localCopy.set(it) }
+    outputDir.set(layout.buildDirectory.dir("generated/nnue"))
 }
 
 android {
@@ -132,10 +147,6 @@ android {
         }
     }
 
-    // AGP 9 rejects Provider instances in the SourceSet API, so pass the plain directory. The
-    // task dependency is carried by the merge*Assets wiring on downloadNnue below.
-    sourceSets.getByName("main").assets.srcDir(nnueOutDir.get().asFile)
-
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
@@ -179,8 +190,12 @@ play {
     defaultToAppBundles.set(true)
 }
 
-tasks.matching { it.name.startsWith("merge") && it.name.endsWith("Assets") }.configureEach {
-    dependsOn(downloadNnue)
+// Registers the download as a generated assets directory for every variant; AGP wires the task
+// dependency into everything that consumes assets.
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(downloadNnue, DownloadNnueTask::outputDir)
+    }
 }
 
 dependencies {
