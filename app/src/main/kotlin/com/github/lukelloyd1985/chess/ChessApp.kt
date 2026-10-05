@@ -1,6 +1,8 @@
 package com.github.lukelloyd1985.chess
 
 import android.app.Application
+import android.content.Context
+import com.github.lukelloyd1985.chess.crash.CrashHandler
 import com.github.lukelloyd1985.chess.auth.AuthManager
 import com.github.lukelloyd1985.chess.data.GameStore
 import com.github.lukelloyd1985.chess.data.OnlineRepository
@@ -27,8 +29,16 @@ class ChessApp : Application() {
         get() = BuildConfig.APPWRITE_PROJECT_ID.isNotBlank() &&
             !BuildConfig.APPWRITE_PROJECT_ID.startsWith("REPLACE")
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        // As early as possible, so even a crash during app start-up shows the crash screen.
+        CrashHandler.install(this)
+    }
+
     override fun onCreate() {
         super.onCreate()
+        // The crash screen runs in its own process; keep that process free of app start-up work.
+        if (CrashHandler.isCrashProcess()) return
         val client = Client(this)
             .setEndpoint(BuildConfig.APPWRITE_ENDPOINT)
             .setProject(BuildConfig.APPWRITE_PROJECT_ID)

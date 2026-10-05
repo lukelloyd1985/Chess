@@ -14,9 +14,9 @@ import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import io.appwrite.enums.ExecutionStatus
-import io.appwrite.exceptions.AppwriteException
 import io.appwrite.services.Account
 import io.appwrite.services.Functions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,7 +65,12 @@ class AuthManager(
         _user.value = try {
             val u = account.get()
             UserProfile(u.id, u.name.ifBlank { u.email }, u.email, photoUrl)
-        } catch (e: AppwriteException) {
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // No session (401), offline, timeout, unregistered platform...: all just mean "signed
+            // out" here. This runs on a background thread at launch, so it must never throw.
+            Log.w(TAG, "Could not restore the session", e)
             null
         }
     }
