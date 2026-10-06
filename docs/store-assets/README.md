@@ -42,6 +42,6 @@ Other languages fall back to these graphics.
 ## Languages
 
 Listing text and release notes live under `app/src/main/play/listings/<locale>/` and
-`app/src/main/play/release-notes/<locale>/`: en-US (default), en-GB, de-DE, es-ES, fr-FR, it-IT,
+`app/src/main/play/release-notes/<locale>/`: en-GB (default), en-US, de-DE, es-ES, fr-FR, it-IT,
 ru-RU, cs-CZ and sk. The non-English texts are translations that have not been reviewed by native
 speakers.
