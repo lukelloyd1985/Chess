@@ -1,0 +1,11 @@
+Ajedrez te permite jugar contra el ordenador, jugar con tus amigos y estudiar cada partida que juegues, sin límite en cuántas analizas.
+
+Juega contra el ordenador: nueve bots, desde principiante hasta máxima fuerza, con pistas, deshacer jugada y relojes con incremento opcionales.
+
+Juega con amigos: crea una partida en línea y comparte un código de seis caracteres, o pasa el dispositivo para jugar en la misma pantalla. Las partidas en línea requieren iniciar sesión con Google; todo lo demás funciona sin cuenta.
+
+Análisis de partidas ilimitado: revisa cualquier partida terminada o PGN importado tantas veces como quieras. Cada jugada se califica de la mejor a un error grave, obtienes la precisión de ambos jugadores, un gráfico de evaluación, las mejores líneas del motor y flechas con la mejor jugada.
+
+Hazlo tuyo: elige entre seis colores de tablero y cuatro estilos de piezas en tres combinaciones de color, y activa o desactiva las coordenadas.
+
+Ajedrez no tiene anuncios ni rastreadores de terceros, y no vende tus datos. Puedes eliminar tu cuenta y sus partidas en línea en cualquier momento, desde la aplicación o desde la web; consulta la política de privacidad para más información.

@@ -1,0 +1,11 @@
+Šachy vám umožní hrát proti počítači, hrát s přáteli a rozebírat každou svou partii - bez omezení počtu analyzovaných partií.
+
+Hra proti počítači: devět botů od začátečníka po plnou sílu, s nápovědou, vrácením tahu a volitelnými hodinami s přídavkem času.
+
+Hra s přáteli: spusťte online partii a sdílejte šestiznakový kód, nebo si předávejte zařízení pro hru na jedné obrazovce. Online partie vyžadují přihlášení přes Google; vše ostatní funguje bez účtu.
+
+Neomezená analýza partií: procházejte libovolnou dohranou partii nebo importovaný PGN, kolikrát chcete. Každý tah je hodnocen od nejlepšího po hrubou chybu, získáte přesnost obou hráčů, graf hodnocení, nejlepší varianty enginu a šipky s nejlepším tahem.
+
+Přizpůsobte si ji: vyberte si ze šesti barev šachovnice a čtyř stylů figur ve třech barevných schématech a souřadnice zapněte nebo vypněte.
+
+Šachy neobsahují reklamy ani trackery třetích stran a neprodávají vaše data. Svůj účet i jeho online partie můžete kdykoli smazat, v aplikaci nebo na webu - podrobnosti najdete v zásadách ochrany osobních údajů.

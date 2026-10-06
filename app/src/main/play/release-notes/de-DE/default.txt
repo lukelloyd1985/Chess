@@ -1,0 +1,1 @@
+Erste Version: Spiele gegen Bots und Freunde, unbegrenzte Partieanalyse sowie anpassbare Bretter und Figuren.

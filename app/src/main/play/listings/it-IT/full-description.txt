@@ -1,0 +1,11 @@
+Scacchi ti permette di giocare contro il computer, di giocare con i tuoi amici e di studiare ogni partita che giochi, senza limiti al numero di partite analizzate.
+
+Gioca contro il computer: nove bot, dal principiante alla massima forza, con suggerimenti, annullamento della mossa e orologi con incremento opzionali.
+
+Gioca con gli amici: avvia una partita online e condividi un codice di sei caratteri, oppure passa il dispositivo per giocare sullo stesso schermo. Le partite online richiedono l'accesso con Google; tutto il resto funziona senza account.
+
+Analisi delle partite illimitata: rivedi qualsiasi partita conclusa o PGN importato quante volte vuoi. Ogni mossa è valutata dalla migliore alla svista, ottieni la precisione di entrambi i giocatori, un grafico di valutazione, le migliori linee del motore e frecce con la mossa migliore.
+
+Rendilo tuo: scegli tra sei colori della scacchiera e quattro stili di pezzi in tre combinazioni di colori, e attiva o disattiva le coordinate.
+
+Scacchi non contiene pubblicità né tracker di terze parti e non vende i tuoi dati. Puoi eliminare il tuo account e le sue partite online in qualsiasi momento, dall'app o dal web; consulta l'informativa sulla privacy per i dettagli.

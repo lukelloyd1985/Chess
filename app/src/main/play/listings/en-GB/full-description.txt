@@ -1,4 +1,4 @@
-Chess lets you play the computer, play your friends, and study every game you play - with no limit on how many you analyze.
+Chess lets you play the computer, play your friends, and study every game you play - with no limit on how many you analyse.
 
 Play the computer: nine bots from beginner to full strength, with hints, undo, and optional clocks and increments.
 

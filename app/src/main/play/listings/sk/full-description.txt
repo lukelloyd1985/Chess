@@ -1,0 +1,11 @@
+Šach vám umožní hrať proti počítaču, hrať s priateľmi a rozoberať každú svoju partiu - bez obmedzenia počtu analyzovaných partií.
+
+Hra proti počítaču: deväť botov od začiatočníka po plnú silu, s nápovedou, vrátením ťahu a voliteľnými hodinami s prírastkom času.
+
+Hra s priateľmi: spustite online partiu a zdieľajte šesťznakový kód, alebo si odovzdávajte zariadenie na hru na jednej obrazovke. Online partie vyžadujú prihlásenie cez Google; všetko ostatné funguje bez účtu.
+
+Neobmedzená analýza partií: prezerajte ľubovoľnú dohratú partiu alebo importovaný PGN, koľkokrát chcete. Každý ťah je hodnotený od najlepšieho po hrubú chybu, získate presnosť oboch hráčov, graf hodnotenia, najlepšie varianty enginu a šípky s najlepším ťahom.
+
+Prispôsobte si ju: vyberte si zo šiestich farieb šachovnice a štyroch štýlov figúr v troch farebných schémach a súradnice zapnite alebo vypnite.
+
+Šach neobsahuje reklamy ani trackery tretích strán a nepredáva vaše údaje. Svoj účet aj jeho online partie môžete kedykoľvek odstrániť, v aplikácii alebo na webe - podrobnosti nájdete v zásadách ochrany osobných údajov.
