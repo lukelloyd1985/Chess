@@ -1,0 +1,11 @@
+Mit Schach spielst du gegen den Computer, gegen deine Freunde und analysierst jede deiner Partien - ohne Begrenzung, wie viele du auswertest.
+
+Gegen den Computer spielen: neun Bots vom Anfänger bis zur vollen Spielstärke, mit Tipps, Zug zurücknehmen und optionalen Uhren mit Zeitzuschlag.
+
+Mit Freunden spielen: Starte eine Online-Partie und teile einen sechsstelligen Code, oder reiche das Gerät für Partien am selben Bildschirm weiter. Für Online-Partien ist eine Anmeldung mit Google nötig; alles andere funktioniert ohne Konto.
+
+Unbegrenzte Partieanalyse: Werte jede beendete Partie oder jedes importierte PGN so oft aus, wie du möchtest. Jeder Zug wird von „bester Zug" bis „Fehler" bewertet, du erhältst eine Genauigkeit für beide Spieler, einen Bewertungsverlauf, die besten Varianten der Engine und Pfeile für den besten Zug.
+
+Mach es zu deinem Spiel: Wähle aus sechs Brettfarben und vier Figurenstilen in drei Farbschemata und blende die Koordinaten ein oder aus.
+
+Schach enthält keine Werbung und keine Tracker von Drittanbietern und verkauft keine Daten. Du kannst dein Konto und seine Online-Partien jederzeit löschen, in der App oder im Web - Details findest du in der Datenschutzerklärung.

@@ -1,0 +1,1 @@
+Prima versione: gioca contro bot e amici, analisi delle partite illimitata e scacchiere e pezzi personalizzabili.

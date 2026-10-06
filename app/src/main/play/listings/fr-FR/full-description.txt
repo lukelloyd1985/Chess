@@ -1,0 +1,11 @@
+Échecs vous permet de jouer contre l'ordinateur, de jouer avec vos amis et d'étudier chaque partie que vous jouez, sans limite sur le nombre de parties analysées.
+
+Jouer contre l'ordinateur : neuf bots, du débutant à la pleine puissance, avec indices, annulation de coup et pendules avec incrément en option.
+
+Jouer avec des amis : lancez une partie en ligne et partagez un code à six caractères, ou faites passer l'appareil pour jouer sur le même écran. Les parties en ligne nécessitent une connexion Google ; tout le reste fonctionne sans compte.
+
+Analyse de parties illimitée : revoyez n'importe quelle partie terminée ou PGN importé aussi souvent que vous le souhaitez. Chaque coup est noté du meilleur à la gaffe, vous obtenez la précision des deux joueurs, un graphique d'évaluation, les meilleures lignes du moteur et des flèches indiquant le meilleur coup.
+
+Personnalisez-le : choisissez parmi six couleurs d'échiquier et quatre styles de pièces dans trois jeux de couleurs, et affichez ou masquez les coordonnées.
+
+Échecs ne contient ni publicité ni traqueur tiers et ne vend pas vos données. Vous pouvez supprimer votre compte et ses parties en ligne à tout moment, depuis l'application ou depuis le web ; consultez la politique de confidentialité pour en savoir plus.

@@ -1,0 +1,1 @@
+První verze: hra proti botům a přátelům, neomezená analýza partií a přizpůsobitelné šachovnice a figury.

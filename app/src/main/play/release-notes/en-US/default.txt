@@ -1,1 +1,1 @@
-Initial release: play bots and friends, unlimited game analysis.
+Initial release: play bots and friends, unlimited game analysis, and customizable boards and pieces.

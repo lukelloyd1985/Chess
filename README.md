@@ -77,8 +77,9 @@ restrict the row to its two players but cannot check chess legality), and online
    (privacy policy, and the account-deletion link in the Data safety section). Update the pages if the data the app collects changes.
 2. The first release of a new app must be created manually in Play Console (with Play App Signing); after that a
 published GitHub Release uploads the AAB to the closed-testing (`alpha`) track via `publishReleaseBundle`, and
-`publishListing` pushes the text under `app/src/main/play/`. Add icon / feature graphic / screenshots under
-`app/src/main/play/listings/en-US/graphics/` to publish them too.
+`publishListing` pushes the listing text for nine languages (en-US, en-GB, de-DE, es-ES, fr-FR, it-IT, ru-RU, cs-CZ, sk) and the
+graphics under `app/src/main/play/` (see `docs/store-assets/README.md` for how the icon, feature graphic and screenshots are
+generated; the screenshots are recreations, so replace them with real device captures when you can).
 
 ## Licence
 
