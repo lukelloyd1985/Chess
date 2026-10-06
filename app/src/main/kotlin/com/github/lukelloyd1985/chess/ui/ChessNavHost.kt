@@ -14,6 +14,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.github.lukelloyd1985.chess.ChessApp
+import com.github.lukelloyd1985.chess.ui.board.ProvideBoardStyle
 import com.github.lukelloyd1985.chess.ui.screens.AnalysisScreen
 import com.github.lukelloyd1985.chess.ui.screens.AnalysisViewModel
 import com.github.lukelloyd1985.chess.ui.screens.BotSelectScreen
@@ -23,6 +24,7 @@ import com.github.lukelloyd1985.chess.ui.screens.GameScreen
 import com.github.lukelloyd1985.chess.ui.screens.GameViewModel
 import com.github.lukelloyd1985.chess.ui.screens.HomeScreen
 import com.github.lukelloyd1985.chess.ui.screens.OnlineLobbyScreen
+import com.github.lukelloyd1985.chess.ui.screens.SettingsScreen
 import com.github.lukelloyd1985.chess.ui.screens.SignInScreen
 import com.github.lukelloyd1985.chess.ui.screens.findActivity
 import kotlinx.coroutines.launch
@@ -47,6 +49,9 @@ fun ChessNavHost(app: ChessApp) {
         }
     }
 
+    val settings by app.settings.state.collectAsStateWithLifecycle()
+
+    ProvideBoardStyle(settings) {
     NavHost(navController = nav, startDestination = if (signedIn) "home" else "signin") {
         composable("signin") { SignInScreen(app.authManager) }
 
@@ -62,6 +67,7 @@ fun ChessNavHost(app: ChessApp) {
                     val activity = context.findActivity()
                     if (activity != null) scope.launch { app.authManager.signOut(activity) }
                 },
+                onOpenSettings = { nav.navigate("settings") },
                 onDeleteAccount = {
                     val activity = context.findActivity()
                     if (activity != null) scope.launch {
@@ -70,6 +76,10 @@ fun ChessNavHost(app: ChessApp) {
                     }
                 },
             )
+        }
+
+        composable("settings") {
+            SettingsScreen(app.settings, onBack = { nav.popBackStack() })
         }
 
         composable("bots") {
@@ -119,5 +129,6 @@ fun ChessNavHost(app: ChessApp) {
             val vm: AnalysisViewModel = viewModel(factory = AnalysisViewModel.Factory(app, id))
             AnalysisScreen(vm, onBack = { nav.popBackStack() })
         }
+    }
     }
 }
