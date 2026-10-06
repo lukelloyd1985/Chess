@@ -39,9 +39,11 @@ class ChessApp : Application() {
         super.onCreate()
         // The crash screen runs in its own process; keep that process free of app start-up work.
         if (CrashHandler.isCrashProcess()) return
+        // Never let a missing/invalid build value crash start-up: setEndpoint throws on a malformed
+        // URL, so keep the SDK's default endpoint instead (the app then just reports "not configured").
         val client = Client(this)
-            .setEndpoint(BuildConfig.APPWRITE_ENDPOINT)
-            .setProject(BuildConfig.APPWRITE_PROJECT_ID)
+        if (BuildConfig.APPWRITE_ENDPOINT.startsWith("http")) client.setEndpoint(BuildConfig.APPWRITE_ENDPOINT)
+        client.setProject(BuildConfig.APPWRITE_PROJECT_ID)
         val account = Account(client)
         val functions = Functions(client)
         authManager = AuthManager(isBackendConfigured, account, functions)
