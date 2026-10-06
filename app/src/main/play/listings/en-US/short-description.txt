@@ -1,1 +1,1 @@
-Play Stockfish bots or friends, and analyze every game with unlimited engine review.
+Play bots or friends, and analyze every game with unlimited engine review.
