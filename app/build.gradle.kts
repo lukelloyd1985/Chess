@@ -8,6 +8,10 @@ plugins {
     alias(libs.plugins.play.publisher)
 }
 
+// GitHub Actions defines an env var as "" (not unset) when its secret does not exist, so a plain
+// `System.getenv(..) ?: default` would bake an empty value into the build. Treat blank as unset.
+fun envOr(name: String, default: String): String = System.getenv(name)?.takeIf { it.isNotBlank() } ?: default
+
 // Stockfish 19 needs its NNUE network file. It is downloaded at build time (the file name
 // contains the first 12 hex chars of its SHA-256, which we verify) and bundled as an asset.
 // Drop a copy in app/nnue/ to build offline.
@@ -86,7 +90,7 @@ android {
         // Play rejects non-increasing versionCodes; the CI run number is a monotonic source.
         versionCode = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         // The release workflow sets this to the git tag (e.g. "v1.2.3").
-        versionName = System.getenv("RELEASE_VERSION_NAME") ?: "1.0.0-dev"
+        versionName = envOr("RELEASE_VERSION_NAME", "1.0.0-dev")
 
         // Stockfish is built for 64-bit ABIs only.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
@@ -104,16 +108,16 @@ android {
             ?.groupValues?.get(1) ?: ""
 
         // The remaining IDs are fixed names this codebase chose, matching appwrite.json's $id fields.
-        buildConfigField("String", "APPWRITE_ENDPOINT", "\"${System.getenv("APPWRITE_ENDPOINT") ?: "https://cloud.appwrite.io/v1"}\"")
+        buildConfigField("String", "APPWRITE_ENDPOINT", "\"${envOr("APPWRITE_ENDPOINT", "https://cloud.appwrite.io/v1")}\"")
         buildConfigField("String", "APPWRITE_PROJECT_ID", "\"$appwriteProjectId\"")
-        buildConfigField("String", "APPWRITE_DATABASE_ID", "\"${System.getenv("APPWRITE_DATABASE_ID") ?: "chess"}\"")
-        buildConfigField("String", "APPWRITE_COLLECTION_GAMES_ID", "\"${System.getenv("APPWRITE_COLLECTION_GAMES_ID") ?: "games"}\"")
-        buildConfigField("String", "APPWRITE_FUNCTION_MAINTENANCE_ID", "\"${System.getenv("APPWRITE_FUNCTION_MAINTENANCE_ID") ?: "maintenance"}\"")
+        buildConfigField("String", "APPWRITE_DATABASE_ID", "\"${envOr("APPWRITE_DATABASE_ID", "chess")}\"")
+        buildConfigField("String", "APPWRITE_COLLECTION_GAMES_ID", "\"${envOr("APPWRITE_COLLECTION_GAMES_ID", "games")}\"")
+        buildConfigField("String", "APPWRITE_FUNCTION_MAINTENANCE_ID", "\"${envOr("APPWRITE_FUNCTION_MAINTENANCE_ID", "maintenance")}\"")
 
         // Google Cloud OAuth 2.0 *Web application* Client ID. Credential Manager mints the ID token
         // for it, and the maintenance Function verifies that token's audience against the same
         // value. Not a secret.
-        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${System.getenv("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${envOr("GOOGLE_WEB_CLIENT_ID", "")}\"")
     }
 
     signingConfigs {
