@@ -1,1 +1,1 @@
-Initial release: play bots and friends, unlimited Stockfish game analysis.
+Initial release: play bots and friends, unlimited game analysis.

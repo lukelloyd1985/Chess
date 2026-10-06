@@ -2,7 +2,7 @@ name: Android Build
 
 on:
   # Run on demand from the Actions tab to get a debug or release APK for
-  # manual testing - build_type picks which. Never builds the AAB or runs
+  # manual testing - build_type picks which (release by default). Never builds the AAB or runs
   # the Play publish steps either way; those stay scoped to an actual
   # published GitHub Release below, since they publish to Play Console.
   workflow_dispatch:
@@ -10,11 +10,11 @@ on:
       build_type:
         description: APK variant to build
         required: true
-        default: debug
+        default: release
         type: choice
         options:
-          - debug
           - release
+          - debug
   # Run automatically whenever a GitHub Release is published, attaching the
   # signed (if signing secrets are configured) release APK to it.
   release:

@@ -57,7 +57,7 @@ fun SignInScreen(auth: AuthManager) {
         Text("♞︎", fontSize = 96.sp, color = ChessColors.Green)
         Text("Chess", fontSize = 40.sp, fontWeight = FontWeight.Bold)
         Text(
-            "Play the computer, challenge friends, and review every game with Stockfish 19.",
+            "Play the computer, challenge friends, and review every game.",
             textAlign = TextAlign.Center,
             color = Muted,
             modifier = Modifier.padding(top = 8.dp, bottom = 40.dp),
