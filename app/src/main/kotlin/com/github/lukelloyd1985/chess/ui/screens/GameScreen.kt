@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -42,6 +43,8 @@ import com.github.lukelloyd1985.chess.core.Piece
 import com.github.lukelloyd1985.chess.core.PieceType
 import com.github.lukelloyd1985.chess.ui.board.BoardArrow
 import com.github.lukelloyd1985.chess.ui.board.ChessBoard
+import com.github.lukelloyd1985.chess.ui.board.LocalBoardStyle
+import com.github.lukelloyd1985.chess.ui.board.PieceIcon
 import com.github.lukelloyd1985.chess.ui.board.pieceGlyph
 import com.github.lukelloyd1985.chess.ui.theme.ChessColors
 
@@ -145,12 +148,24 @@ fun GameScreen(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     for (t in listOf(PieceType.QUEEN, PieceType.ROOK, PieceType.BISHOP, PieceType.KNIGHT)) {
                         TextButton(onClick = { viewModel.choosePromotion(t) }) {
-                            Text(
-                                pieceGlyph(Piece.make(t, white)),
-                                fontSize = 40.sp,
-                                color = if (white) Color.White else Color(0xFF1B1B1B),
-                                modifier = Modifier.background(ChessColors.BoardDark, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp),
-                            )
+                            val boardStyle = LocalBoardStyle.current
+                            val piece = Piece.make(t, white)
+                            if (boardStyle.art != null) {
+                                PieceIcon(
+                                    piece,
+                                    Modifier
+                                        .size(52.dp)
+                                        .background(boardStyle.theme.dark, RoundedCornerShape(8.dp))
+                                        .padding(4.dp),
+                                )
+                            } else {
+                                Text(
+                                    pieceGlyph(piece),
+                                    fontSize = 40.sp,
+                                    color = if (white) Color.White else Color(0xFF1B1B1B),
+                                    modifier = Modifier.background(boardStyle.theme.dark, RoundedCornerShape(8.dp)).padding(horizontal = 6.dp),
+                                )
+                            }
                         }
                     }
                 }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -49,6 +50,7 @@ fun HomeScreen(
     onOpenAnalysis: (String) -> Unit,
     onSignOut: () -> Unit,
     onDeleteAccount: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     var games by remember { mutableStateOf(store.all()) }
@@ -61,6 +63,7 @@ fun HomeScreen(
                 Text("Chess", fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 Text(user?.let { "Signed in as ${it.name}" } ?: "Guest", color = Muted, fontSize = 13.sp)
             }
+            IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, contentDescription = "Appearance settings", tint = Muted) }
             if (user != null) TextButton(onClick = { confirmDelete = true }) { Text("Delete account", color = Muted) }
             TextButton(onClick = onSignOut) { Text(if (user != null) "Sign out" else "Sign in") }
         }

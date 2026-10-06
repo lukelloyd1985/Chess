@@ -66,6 +66,7 @@ fun ChessBoard(
     onSquareClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val style = LocalBoardStyle.current
     Box(modifier.aspectRatio(1f)) {
         Column(Modifier.fillMaxSize()) {
             for (row in 0 until 8) {
@@ -83,8 +84,9 @@ fun ChessBoard(
                             isTarget = sq in targets,
                             isLastMove = lastMove != null && (sq == lastMove.from || sq == lastMove.to),
                             isCheck = sq == checkSquare,
-                            fileLabel = if (row == 7) ('a' + file).toString() else null,
-                            rankLabel = if (col == 0) ('1' + rank).toString() else null,
+                            fileLabel = if (style.showCoordinates && row == 7) ('a' + file).toString() else null,
+                            rankLabel = if (style.showCoordinates && col == 0) ('1' + rank).toString() else null,
+                            style = style,
                             onClick = { onSquareClick(sq) },
                         )
                     }
@@ -141,10 +143,11 @@ private fun BoardSquare(
     isCheck: Boolean,
     fileLabel: String?,
     rankLabel: String?,
+    style: BoardStyle,
     onClick: () -> Unit,
 ) {
-    val base = if (isLight) ChessColors.BoardLight else ChessColors.BoardDark
-    val labelColor = if (isLight) ChessColors.BoardDark else ChessColors.BoardLight
+    val base = if (isLight) style.theme.light else style.theme.dark
+    val labelColor = if (isLight) style.theme.dark else style.theme.light
     BoxWithConstraints(
         modifier
             .background(base)
@@ -174,19 +177,24 @@ private fun BoardSquare(
         }
         if (piece != Piece.EMPTY) {
             val white = Piece.isWhite(piece)
-            Text(
-                pieceGlyph(piece),
-                Modifier.align(Alignment.Center),
-                style = TextStyle(
-                    fontSize = sizeSp * 0.82f,
-                    color = if (white) Color(0xFFFFFFFF) else Color(0xFF1B1B1B),
-                    shadow = Shadow(
-                        color = if (white) Color(0xFF000000) else Color(0x99FFFFFF),
-                        offset = Offset(0f, 0f),
-                        blurRadius = 6f,
+            if (style.art != null) {
+                PieceIcon(piece, Modifier.align(Alignment.Center).fillMaxSize(0.92f), style)
+            } else {
+                // Artwork failed to load: fall back to plain text glyphs.
+                Text(
+                    pieceGlyph(piece),
+                    Modifier.align(Alignment.Center),
+                    style = TextStyle(
+                        fontSize = sizeSp * 0.82f,
+                        color = if (white) style.pieceColors.white else style.pieceColors.black,
+                        shadow = Shadow(
+                            color = if (white) Color(0xFF000000) else Color(0x99FFFFFF),
+                            offset = Offset(0f, 0f),
+                            blurRadius = 6f,
+                        ),
                     ),
-                ),
-            )
+                )
+            }
         }
         if (isTarget) {
             val capture = piece != Piece.EMPTY

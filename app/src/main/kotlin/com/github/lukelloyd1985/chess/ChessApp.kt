@@ -6,6 +6,7 @@ import com.github.lukelloyd1985.chess.crash.CrashHandler
 import com.github.lukelloyd1985.chess.auth.AuthManager
 import com.github.lukelloyd1985.chess.data.GameStore
 import com.github.lukelloyd1985.chess.data.OnlineRepository
+import com.github.lukelloyd1985.chess.settings.AppSettings
 import io.appwrite.Client
 import io.appwrite.services.Account
 import io.appwrite.services.Databases
@@ -19,6 +20,8 @@ class ChessApp : Application() {
     lateinit var gameStore: GameStore
         private set
     lateinit var onlineRepository: OnlineRepository
+        private set
+    lateinit var settings: AppSettings
         private set
 
     /**
@@ -48,6 +51,7 @@ class ChessApp : Application() {
         val functions = Functions(client)
         authManager = AuthManager(isBackendConfigured, account, functions)
         gameStore = GameStore(this)
+        settings = AppSettings(this)
         onlineRepository = OnlineRepository(Databases(client), Realtime(client), functions)
     }
 }
