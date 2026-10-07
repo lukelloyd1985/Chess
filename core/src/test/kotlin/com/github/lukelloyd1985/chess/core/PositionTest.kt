@@ -184,4 +184,28 @@ class PositionTest {
         val picks = (0 until 200).map { Bot.pickMove(bot, listOf("a", "b", "c"), kotlin.random.Random(it)) }.toSet()
         assertTrue(picks.size > 1)
     }
+
+    @Test fun gameFromMidgamePosition() {
+        // A position reached after 1.e4 e5 2.Nf3 Nc6 (e.g. picked in game analysis), black to... white to move.
+        val fen = "r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3"
+        val g = ChessGame(Position.fromFen(fen))
+        assertEquals("position fen $fen", g.uciPositionCommand())
+        assertTrue(g.playSan("Bb5"))
+        assertTrue(g.playSan("a6"))
+        assertEquals("position fen $fen moves f1b5 a7a6", g.uciPositionCommand())
+        assertNull(g.result())
+        // Saved games keep the starting position and continue the move numbering.
+        val pgn = g.toPgn()
+        assertTrue(pgn.contains("[FEN \"$fen\"]"))
+        assertTrue(pgn.contains("3. Bb5 a6"))
+        val parsed = Pgn.parse(pgn)
+        assertEquals(g.sans, parsed.game.sans)
+        assertEquals(g.position.toFen(), parsed.game.position.toFen())
+    }
+
+    @Test fun gameFromFinishedPositionIsAlreadyOver() {
+        val mated = Position.fromFen("R5k1/5ppp/8/8/8/8/8/4K3 b - - 0 1")
+        assertTrue(ChessGame(mated).isOver())
+        assertNull(ChessGame(Position.initial()).result())
+    }
 }

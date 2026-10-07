@@ -37,6 +37,8 @@ data class GameConfig(
     val playerWhite: Boolean = true,
     val timeControlIndex: Int = 0,
     val onlineCode: String? = null,
+    /** FEN to start from (e.g. a position picked in game analysis); null = the standard start. */
+    val startFen: String? = null,
 )
 
 data class GameUiState(
@@ -70,7 +72,9 @@ data class GameUiState(
 class GameViewModel(app: Application, private val config: GameConfig) : AndroidViewModel(app) {
     private val chessApp = app as ChessApp
     private val engine = StockfishEngine(app)
-    private val game = ChessGame()
+    private val game = ChessGame(
+        config.startFen?.let { fen -> runCatching { Position.fromFen(fen) }.getOrNull() } ?: Position.initial(),
+    )
     private val bot: Bot? = if (config.mode == GameMode.BOT) Bot.byId(config.botId) else null
     private val timeControl = TimeControl.PRESETS.getOrElse(config.timeControlIndex) { TimeControl.PRESETS[0] }
         .takeIf { config.mode != GameMode.ONLINE } ?: TimeControl.PRESETS[0]
