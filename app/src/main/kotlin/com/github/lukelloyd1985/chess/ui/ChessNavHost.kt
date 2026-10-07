@@ -1,5 +1,6 @@
 package com.github.lukelloyd1985.chess.ui
 
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,7 +31,8 @@ import com.github.lukelloyd1985.chess.ui.screens.findActivity
 import kotlinx.coroutines.launch
 
 private fun gameRoute(c: GameConfig): String =
-    "game?mode=${c.mode.name}&bot=${c.botId}&white=${c.playerWhite}&tc=${c.timeControlIndex}&code=${c.onlineCode ?: ""}"
+    "game?mode=${c.mode.name}&bot=${c.botId}&white=${c.playerWhite}&tc=${c.timeControlIndex}&code=${c.onlineCode ?: ""}" +
+        "&fen=${Uri.encode(c.startFen.orEmpty())}"
 
 @Composable
 fun ChessNavHost(app: ChessApp) {
@@ -97,13 +99,14 @@ fun ChessNavHost(app: ChessApp) {
         }
 
         composable(
-            "game?mode={mode}&bot={bot}&white={white}&tc={tc}&code={code}",
+            "game?mode={mode}&bot={bot}&white={white}&tc={tc}&code={code}&fen={fen}",
             arguments = listOf(
                 navArgument("mode") { type = NavType.StringType; defaultValue = "LOCAL" },
                 navArgument("bot") { type = NavType.StringType; defaultValue = "improver" },
                 navArgument("white") { type = NavType.BoolType; defaultValue = true },
                 navArgument("tc") { type = NavType.IntType; defaultValue = 0 },
                 navArgument("code") { type = NavType.StringType; defaultValue = "" },
+                navArgument("fen") { type = NavType.StringType; defaultValue = "" },
             ),
         ) { entry ->
             val a = entry.arguments
@@ -113,6 +116,7 @@ fun ChessNavHost(app: ChessApp) {
                 playerWhite = a?.getBoolean("white") ?: true,
                 timeControlIndex = a?.getInt("tc") ?: 0,
                 onlineCode = a?.getString("code")?.takeIf { it.isNotEmpty() },
+                startFen = a?.getString("fen")?.takeIf { it.isNotEmpty() },
             )
             val vm: GameViewModel = viewModel(factory = GameViewModel.Factory(app, config))
             GameScreen(
@@ -127,7 +131,11 @@ fun ChessNavHost(app: ChessApp) {
         composable("analysis/{id}", arguments = listOf(navArgument("id") { type = NavType.StringType })) { entry ->
             val id = entry.arguments?.getString("id").orEmpty()
             val vm: AnalysisViewModel = viewModel(factory = AnalysisViewModel.Factory(app, id))
-            AnalysisScreen(vm, onBack = { nav.popBackStack() })
+            AnalysisScreen(
+                vm,
+                onBack = { nav.popBackStack() },
+                onPlayFromHere = { config -> nav.navigate(gameRoute(config)) },
+            )
         }
     }
     }

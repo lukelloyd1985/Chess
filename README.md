@@ -5,6 +5,7 @@ An Android chess app in the style of chess.com, powered by **Stockfish 19**.
 * **Play bots** – 9 computer opponents from ~400 to 3190 Elo (Stockfish's `UCI_Elo` limiter, think-time limits and deliberate "sloppiness" for the beginner levels), with undo, hints, optional clocks and increments.
 * **Play friends** – online games shared by a 6-character code (Appwrite), plus pass-and-play on one device.
 * **Unlimited game analysis** – every finished or imported (PGN) game can be reviewed as often as you like: per-move classification (best → blunder), accuracy for both sides, eval bar and graph, engine lines, best-move arrows, three analysis depths. Nothing is capped or paywalled.
+* **Play from any position** – in game analysis, step to any move and tap *Play from here* to play the computer from that exact position (as either side, any bot, optional clock).
 * **Appearance** – six board colour themes, four piece styles (Classic, Serif, Outline, Pixel; vector artwork bundled in `app/src/main/assets/pieces/`), three piece colour schemes and optional coordinates, with a live preview (home screen -> gear icon).
 * **Sign in with Google** – Credential Manager bridged into an Appwrite session. Guests can still play offline.
 

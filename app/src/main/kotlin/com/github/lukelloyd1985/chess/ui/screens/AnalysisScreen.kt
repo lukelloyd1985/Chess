@@ -5,6 +5,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
+import com.github.lukelloyd1985.chess.core.TimeControl
+import com.github.lukelloyd1985.chess.core.ChessGame
+import com.github.lukelloyd1985.chess.core.Bot
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Button
+import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -72,9 +82,15 @@ fun displayScore(score: EngineScore): String {
 }
 
 @Composable
-fun AnalysisScreen(viewModel: AnalysisViewModel, onBack: () -> Unit) {
+fun AnalysisScreen(
+    viewModel: AnalysisViewModel,
+    onBack: () -> Unit,
+    /** Starts a game against the computer from the position currently shown. */
+    onPlayFromHere: (GameConfig) -> Unit,
+) {
     val s by viewModel.state.collectAsStateWithLifecycle()
     var flipped by remember { mutableStateOf(false) }
+    var showPlayDialog by remember { mutableStateOf(false) }
     val game = s.game
 
     Column(Modifier.fillMaxSize().systemBarsPadding()) {
@@ -92,6 +108,25 @@ fun AnalysisScreen(viewModel: AnalysisViewModel, onBack: () -> Unit) {
         val eval = s.evals.getOrNull(cur)
         val analysis = s.analysis
         val moveInfo = analysis?.moves?.getOrNull(cur - 1)
+
+        if (showPlayDialog) {
+            PlayFromHereDialog(
+                whiteToMove = pos.whiteToMove,
+                onDismiss = { showPlayDialog = false },
+                onStart = { botId, playerWhite, timeControlIndex ->
+                    showPlayDialog = false
+                    onPlayFromHere(
+                        GameConfig(
+                            mode = GameMode.BOT,
+                            botId = botId,
+                            playerWhite = playerWhite,
+                            timeControlIndex = timeControlIndex,
+                            startFen = pos.toFen(),
+                        ),
+                    )
+                },
+            )
+        }
 
         LazyColumn(Modifier.fillMaxSize()) {
             item {
@@ -161,6 +196,13 @@ fun AnalysisScreen(viewModel: AnalysisViewModel, onBack: () -> Unit) {
                     IconButton(onClick = { viewModel.step(-1) }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous move") }
                     IconButton(onClick = { viewModel.step(1) }) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next move") }
                     IconButton(onClick = { viewModel.goTo(game.ply) }) { Text("⏭", fontSize = 20.sp) }
+                }
+            }
+            item {
+                // A position with no legal moves (or an already-drawn one) can't be played on from.
+                val canPlayFrom = remember(pos) { ChessGame(pos).result() == null }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center) {
+                    Button(onClick = { showPlayDialog = true }, enabled = canPlayFrom) { Text("Play from here") }
                 }
             }
             if (s.evals.any { it != null }) {
@@ -309,4 +351,48 @@ private fun SummaryTable(rows: List<Triple<MoveQuality, Int, Int>>) {
             }
         }
     }
+}
+
+@Composable
+private fun PlayFromHereDialog(
+    whiteToMove: Boolean,
+    onDismiss: () -> Unit,
+    onStart: (botId: String, playerWhite: Boolean, timeControlIndex: Int) -> Unit,
+) {
+    var botId by remember { mutableStateOf("improver") }
+    // Default to playing the side that is to move in this position.
+    var playWhite by remember { mutableStateOf(whiteToMove) }
+    var timeControl by remember { mutableStateOf(0) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Play from this position") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Play as", color = Muted, fontSize = 13.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(selected = playWhite, onClick = { playWhite = true }, label = { Text("White") })
+                    FilterChip(selected = !playWhite, onClick = { playWhite = false }, label = { Text("Black") })
+                }
+                Text("Opponent", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                Bot.ALL.forEach { bot ->
+                    Row(
+                        Modifier.fillMaxWidth().clickable { botId = bot.id }.padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = botId == bot.id, onClick = { botId = bot.id })
+                        Text("${bot.name} (${bot.elo})")
+                    }
+                }
+                Text("Time control", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 6.dp))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TimeControl.PRESETS.forEachIndexed { i, tc ->
+                        FilterChip(selected = timeControl == i, onClick = { timeControl = i }, label = { Text(tc.label) })
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = { onStart(botId, playWhite, timeControl) }) { Text("Play") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
