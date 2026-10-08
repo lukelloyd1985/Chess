@@ -96,7 +96,8 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         externalNativeBuild {
             cmake {
-                arguments += listOf("-DANDROID_STL=c++_static")
+                // ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES: 16 KB page size support (NDK r27; the default from r28).
+                arguments += listOf("-DANDROID_STL=c++_static", "-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON")
             }
         }
 
