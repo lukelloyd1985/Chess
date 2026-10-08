@@ -141,6 +141,23 @@ jobs:
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
         run: ./gradlew assembleRelease --stacktrace
 
+      # Google Play requires native code to support 16 KB memory pages (Android 15+ devices). Checks
+      # the ELF segment alignment of every native library packaged in the release APK, so a library
+      # that is not compliant fails the build here instead of at Play Console.
+      - name: Verify 16 KB page size alignment
+        if: ${{ github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.build_type == 'release') }}
+        run: |
+          apk=$(ls app/build/outputs/apk/release/*.apk | head -1)
+          dir="$RUNNER_TEMP/apkcheck"
+          rm -rf "$dir" && mkdir -p "$dir"
+          unzip -q "$apk" 'lib/*' -d "$dir"
+          bad=0
+          while IFS= read -r so; do
+            min=$(readelf -lW "$so" | awk '/ LOAD /{print $NF}' | sort | head -1)
+            if [ $(( min )) -lt 16384 ]; then echo "NOT 16 KB aligned ($min): $so"; bad=1; else echo "ok ($min): $so"; fi
+          done < <(find "$dir/lib" -name '*.so')
+          exit $bad
+
       # The App Bundle Google Play requires for a Play Store upload - only
       # meaningful for an actual published Release (see the Play publish
       # steps below), never for a manual build_type: release run, which

@@ -31,6 +31,11 @@ target_compile_definitions(stockfish PRIVATE NDEBUG NNUE_EMBEDDING_OFF IS_64BIT)
 target_compile_options(stockfish PRIVATE -O3 -fno-exceptions)
 target_link_options(stockfish PRIVATE -pie)
 
+# 16 KB page size support (required by Google Play for apps targeting Android 15+; devices with 16 KB
+# pages cannot map ELF segments that are only 4 KB aligned). NDK r28+ does this by default; for NDK r27
+# the flags below are needed (app/build.gradle.kts also passes ANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES).
+target_link_options(stockfish PRIVATE -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384)
+
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64" OR ANDROID_ABI STREQUAL "arm64-v8a")
     target_compile_definitions(stockfish PRIVATE USE_NEON=8)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64" OR ANDROID_ABI STREQUAL "x86_64")
